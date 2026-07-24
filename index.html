@@ -1,4 +1,3 @@
-html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -22,18 +21,13 @@ html
             body { background: white !important; color: black !important; font-size: 10pt; }
             .print-card { border: 1px solid #cbd5e1 !important; box-shadow: none !important; break-inside: avoid; }
         }
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 5px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background-color: #cbd5e1;
-            border-radius: 9999px;
-        }
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 9999px; }
     </style>
 </head>
 <body class="bg-slate-100 text-slate-900 min-h-screen flex flex-col font-sans antialiased selection:bg-emerald-500 selection:text-white">
 
-    <!-- Non-sticky Navigation Header -->
+    <!-- Navigation Header -->
     <header class="bg-slate-950 text-white border-b border-slate-800 relative z-10 no-print shadow-md">
         <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-3">
             <div class="flex items-center space-x-3">
@@ -79,7 +73,7 @@ html
 
     <main class="max-w-7xl mx-auto w-full px-4 py-4 flex-1 space-y-4">
 
-        <!-- Staff Scratchpad / Virtual Whiteboard -->
+        <!-- Staff Scratchpad -->
         <div class="bg-amber-50/90 border border-amber-200/80 rounded-xl p-3 shadow-2xs no-print">
             <div class="flex justify-between items-center mb-1">
                 <label class="text-xs font-black text-amber-900 flex items-center gap-1.5 uppercase tracking-wider">
@@ -87,11 +81,11 @@ html
                 </label>
                 <span class="text-[10px] font-semibold text-amber-700">Real-time sync between coaches</span>
             </div>
-            <textarea id="staffNotes" rows="2" onchange="syncActivePracticeToCloud()" placeholder="Quick messages for coaches during the school day (e.g. Coach Smith running OL today, running 5 mins late, etc)..." class="w-full bg-white/80 border border-amber-200 rounded-lg p-2 text-xs font-medium text-amber-950 focus:ring-2 focus:ring-amber-400 focus:outline-none"></textarea>
+            <textarea id="staffNotes" rows="2" onchange="syncActivePracticeToCloud()" placeholder="Quick messages for coaches during the school day..." class="w-full bg-white/80 border border-amber-200 rounded-lg p-2 text-xs font-medium text-amber-950 focus:ring-2 focus:ring-amber-400 focus:outline-none"></textarea>
         </div>
 
-        <!-- Practice Overview Bar -->
-        <div class="bg-white rounded-xl shadow-2xs border border-slate-200 p-3.5 print-card">
+        <!-- Practice Overview Bar & Live Weather Integration -->
+        <div class="bg-white rounded-xl shadow-2xs border border-slate-200 p-3.5 print-card space-y-3">
             <div class="flex flex-wrap justify-between items-center gap-3">
                 <div class="flex items-center gap-3 flex-wrap flex-1">
                     <div class="flex items-center gap-2">
@@ -118,8 +112,39 @@ html
                 </span>
             </div>
 
-            <!-- Focus & Review Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3 pt-3 border-t border-slate-100">
+            <!-- Live Weather & Water Break Protocol Injector -->
+            <div class="bg-cyan-50/70 border border-cyan-200 rounded-lg p-2.5 flex flex-wrap justify-between items-center gap-2 no-print">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <div class="flex items-center gap-1.5 text-xs font-black text-cyan-950 uppercase">
+                        <i data-lucide="sun-medium" class="w-4 h-4 text-amber-500"></i>
+                        <span>OHSAA Heat Safety:</span>
+                    </div>
+
+                    <button onclick="fetchLiveWeather()" class="bg-cyan-700 hover:bg-cyan-800 text-white text-xs font-bold px-2.5 py-1 rounded-md transition flex items-center gap-1">
+                        <i data-lucide="cloud-sun" class="w-3.5 h-3.5"></i> Fetch Local Weather
+                    </button>
+
+                    <span id="weatherReadout" class="text-xs font-bold text-cyan-900 bg-white/80 border border-cyan-200 px-2 py-0.5 rounded">
+                        75°F • Normal Conditions
+                    </span>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <select id="heatIndexSelect" class="bg-white border border-cyan-300 text-cyan-950 text-xs font-bold rounded-md px-2 py-1 focus:outline-none">
+                        <option value="normal">Green Zone (< 79.7°F) • Standard Breaks</option>
+                        <option value="elevated">Caution (79.8°-84.6°F) • 3x 4m Breaks/hr</option>
+                        <option value="high">Warning (84.7°-87.6°F) • 4x 4m Breaks/hr</option>
+                        <option value="extreme">Extreme (87.8°-89.7°F) • 4x 5m Breaks/hr</option>
+                    </select>
+
+                    <button onclick="applyHeatProtocol()" class="bg-cyan-800 hover:bg-cyan-900 text-white text-xs font-bold px-3 py-1 rounded-lg transition flex items-center gap-1">
+                        <i data-lucide="droplets" class="w-3.5 h-3.5"></i> Inject Water Breaks
+                    </button>
+                </div>
+            </div>
+
+            <!-- Focus Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1 border-t border-slate-100">
                 <div class="bg-emerald-50/50 rounded-lg p-2 border border-emerald-100">
                     <label class="block text-[11px] font-black text-emerald-800 uppercase mb-1">🎯 Today's Focus</label>
                     <textarea id="todayFocus" rows="1" onchange="syncActivePracticeToCloud()" placeholder="Technique & Install focus..." class="w-full bg-white border border-emerald-200 rounded p-1.5 text-xs text-slate-800 focus:outline-none"></textarea>
@@ -135,12 +160,10 @@ html
             </div>
         </div>
 
-        <!-- Top Fixed Routine Cards: Warm Up -->
+        <!-- Dynamic Warmup -->
         <div class="bg-white rounded-xl shadow-2xs border border-slate-200 p-3 print-card flex flex-wrap justify-between items-center gap-2">
             <div class="flex items-center gap-2">
-                <span class="bg-slate-900 text-white text-[10px] font-black px-2 py-0.5 rounded">
-                    ROUTINE
-                </span>
+                <span class="bg-slate-900 text-white text-[10px] font-black px-2 py-0.5 rounded">ROUTINE</span>
                 <span class="font-extrabold text-slate-900 text-sm">Warm Up</span>
                 <span class="text-xs font-bold text-slate-500">• Dynamic Warmup (10 Mins)</span>
             </div>
@@ -160,9 +183,7 @@ html
                 </button>
             </div>
 
-            <div id="periodsContainer" class="space-y-3">
-                <!-- Period cards dynamically loaded -->
-            </div>
+            <div id="periodsContainer" class="space-y-3"></div>
         </div>
     </main>
 
@@ -182,31 +203,30 @@ html
                 </button>
             </div>
 
-            <!-- Search Bar -->
             <div class="flex items-center gap-2">
                 <div class="relative flex-1">
                     <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
                     <input type="text" id="historySearchInput" oninput="renderHistoryList()" placeholder="Search practices by focus or date..." class="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs font-semibold focus:outline-none focus:border-indigo-500">
                 </div>
-                <span id="historyCountBadge" class="text-xs font-bold bg-slate-100 text-slate-600 px-2.5 py-1.5 rounded-lg border border-slate-200">
-                    0 Saved
-                </span>
+                <span id="historyCountBadge" class="text-xs font-bold bg-slate-100 text-slate-600 px-2.5 py-1.5 rounded-lg border border-slate-200">0 Saved</span>
             </div>
 
-            <div id="historyListContainer" class="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
-                <!-- Rendered history -->
-            </div>
+            <div id="historyListContainer" class="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar"></div>
         </div>
     </div>
 
-    <!-- Live Synced Sideline Timer Modal -->
+    <!-- Live Synced Sideline Timer Modal with Injury Timeout Engine -->
     <div id="timerModal" class="fixed inset-0 bg-slate-950 z-50 hidden flex-col justify-between p-6 text-white no-print">
         <div class="flex justify-between items-center max-w-4xl mx-auto w-full border-b border-slate-800 pb-3">
             <div class="flex items-center gap-3">
                 <span class="bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full font-black text-xs uppercase tracking-wider flex items-center gap-1.5">
                     <span class="w-2 h-2 rounded-full bg-slate-950 animate-ping"></span> Live Staff Timer
                 </span>
-                <h2 class="text-base font-bold text-slate-300" id="modalPracticeTitle">Middle School Football</h2>
+                
+                <label class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 px-2.5 py-1 rounded-lg cursor-pointer">
+                    <input type="checkbox" id="isMasterTimerCheckbox" onchange="toggleMasterRole(this.checked)" checked class="rounded text-amber-400 focus:ring-0">
+                    <span class="text-[11px] font-bold text-amber-300" id="roleLabel">Master Clock Operator</span>
+                </label>
             </div>
             <button onclick="closeTimerModal()" class="p-2 bg-slate-900 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition">
                 <i data-lucide="x" class="w-5 h-5"></i>
@@ -222,22 +242,46 @@ html
                 <p id="timerPeriodDrills" class="text-amber-400 text-lg font-extrabold mt-2 max-w-xl mx-auto">Dynamic Warmup</p>
             </div>
 
-            <div class="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl backdrop-blur-md">
+            <!-- Injury Timeout Active Banner -->
+            <div id="injuryBanner" class="hidden bg-rose-600 border border-rose-400 text-white rounded-2xl p-4 shadow-xl space-y-2 animate-pulse">
+                <div class="flex justify-center items-center gap-2 font-black text-lg uppercase tracking-wide">
+                    <i data-lucide="first-aid-kit" class="w-6 h-6"></i> INJURY TIMEOUT IN PROGRESS
+                </div>
+                <div class="font-mono text-3xl font-black text-amber-200" id="injuryTimerDisplay">00:00</div>
+                <p class="text-xs font-medium text-rose-100">Practice clock is paused across all staff devices.</p>
+                <div class="flex justify-center gap-2 pt-2">
+                    <button onclick="resumeFromInjury(false)" class="bg-white text-rose-950 text-xs font-black px-3 py-1.5 rounded-lg">Resume Practice</button>
+                    <button onclick="resumeFromInjury(true)" class="bg-amber-400 text-slate-950 text-xs font-black px-3 py-1.5 rounded-lg">Resume & Shift Rest of Schedule</button>
+                </div>
+            </div>
+
+            <div id="normalTimerCard" class="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl backdrop-blur-md">
                 <div id="bigTimerDisplay" class="font-mono text-7xl md:text-9xl font-black text-amber-400 tracking-wider leading-none">
                     10:00
                 </div>
 
-                <div class="flex justify-center items-center gap-4 mt-6 flex-wrap">
+                <div class="flex justify-center items-center gap-3 mt-6 flex-wrap">
+                    <button id="prevBtn" onclick="prevSyncedPeriod()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-3 rounded-xl font-bold transition" title="Previous Period">
+                        <i data-lucide="skip-back" class="w-5 h-5"></i>
+                    </button>
+
                     <button id="playPauseBtn" onclick="toggleSyncedTimer()" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-6 py-3 rounded-xl font-black text-base shadow-lg transition transform active:scale-95 flex items-center gap-2">
                         <i data-lucide="play" class="w-6 h-6 fill-current"></i> START
                     </button>
-                    <button onclick="resetSyncedTimer()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-3 rounded-xl font-bold transition" title="Reset Current Period">
+
+                    <button id="injuryBtn" onclick="triggerInjuryTimeout()" class="bg-rose-600 hover:bg-rose-500 text-white px-4 py-3 rounded-xl font-black text-xs flex items-center gap-1.5 shadow-lg transition transform active:scale-95">
+                        <i data-lucide="activity" class="w-4 h-4"></i> INJURY TIMEOUT
+                    </button>
+
+                    <button id="resetBtn" onclick="resetSyncedTimer()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-3 rounded-xl font-bold transition" title="Reset Current Period">
                         <i data-lucide="rotate-ccw" class="w-5 h-5"></i>
                     </button>
+
                     <button onclick="playWhistle()" class="bg-amber-400 hover:bg-amber-300 text-slate-950 px-5 py-3 rounded-xl font-black text-xs flex items-center gap-2 shadow-lg transition transform active:scale-95">
                         <i data-lucide="volume-2" class="w-5 h-5"></i> WHISTLE
                     </button>
-                    <button onclick="nextSyncedPeriod()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-3 rounded-xl font-bold transition" title="Next Period">
+
+                    <button id="nextBtn" onclick="nextSyncedPeriod()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-3 rounded-xl font-bold transition" title="Next Period">
                         <i data-lucide="skip-forward" class="w-5 h-5"></i>
                     </button>
                 </div>
@@ -253,11 +297,11 @@ html
         </div>
 
         <div class="text-center text-[10px] text-slate-600 max-w-4xl mx-auto w-full border-t border-slate-900 pt-2">
-            Middle School Gridiron Assistant • Synced across all devices
+            Middle School Gridiron Assistant • Master Clock & Injury Delay Tracking
         </div>
     </div>
 
-    <!-- Firebase SDK Setup & Realtime Timer Engine -->
+    <!-- Firebase SDK Setup & Synchronized Engine -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -276,12 +320,13 @@ html
         let isRemoteUpdate = false;
         window.savedHistory = [];
 
-        // Global Timer Synchronized State
         window.syncedTimer = {
             activePeriodIndex: 0,
             isRunning: false,
             endTimeMs: 0,
-            remainingSeconds: 600
+            remainingSeconds: 600,
+            isInjuryTimeout: false,
+            injuryStartMs: 0
         };
 
         const initAuth = async () => {
@@ -299,25 +344,19 @@ html
 
         onAuthStateChanged(auth, (user) => {
             currentUser = user;
-            if (user) {
-                setupRealtimeStaffListeners();
-            }
+            if (user) setupRealtimeStaffListeners();
         });
 
         function setupRealtimeStaffListeners() {
-            // Shared History Collection Listener
             const historyColRef = collection(db, 'artifacts', appId, 'public', 'data', 'practice_history');
             onSnapshot(historyColRef, (snapshot) => {
                 const list = [];
-                snapshot.forEach(docSnap => {
-                    list.push({ id: docSnap.id, ...docSnap.data() });
-                });
+                snapshot.forEach(docSnap => list.push({ id: docSnap.id, ...docSnap.data() }));
                 list.sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
                 window.savedHistory = list;
                 renderHistoryList();
             }, (err) => console.error("History snapshot error:", err));
 
-            // Shared Practice & Timer Sync Listener
             const activeDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'active_practice', 'current');
             onSnapshot(activeDocRef, (docSnap) => {
                 if (docSnap.exists()) {
@@ -339,7 +378,6 @@ html
                         isRemoteUpdate = false;
                     }
 
-                    // Process Synced Timer State from Cloud
                     if (data.syncedTimer) {
                         handleIncomingSyncedTimer(data.syncedTimer);
                     }
@@ -351,18 +389,28 @@ html
             window.syncedTimer = incoming;
             window.activePeriodIndex = incoming.activePeriodIndex || 0;
             
-            if (incoming.isRunning) {
-                const now = Date.now();
-                const diffSecs = Math.max(0, Math.round((incoming.endTimeMs - now) / 1000));
-                window.timerSeconds = diffSecs;
+            if (incoming.isInjuryTimeout) {
+                document.getElementById('injuryBanner').classList.remove('hidden');
+                document.getElementById('normalTimerCard').classList.add('opacity-40');
+                startInjuryTick();
             } else {
-                window.timerSeconds = incoming.remainingSeconds || 0;
+                document.getElementById('injuryBanner').classList.add('hidden');
+                document.getElementById('normalTimerCard').classList.remove('opacity-40');
+                if (window.injuryInterval) clearInterval(window.injuryInterval);
+
+                if (incoming.isRunning) {
+                    const now = Date.now();
+                    const diffSecs = Math.max(0, Math.round((incoming.endTimeMs - now) / 1000));
+                    window.timerSeconds = diffSecs;
+                } else {
+                    window.timerSeconds = incoming.remainingSeconds || 0;
+                }
             }
 
             setupTimerPeriodDisplay();
             updateTimerButtonUI(incoming.isRunning);
 
-            if (incoming.isRunning && !window.timerInterval) {
+            if (incoming.isRunning && !window.timerInterval && !incoming.isInjuryTimeout) {
                 startLocalTimerTick();
             } else if (!incoming.isRunning && window.timerInterval) {
                 clearInterval(window.timerInterval);
@@ -374,8 +422,7 @@ html
             if (!currentUser || isRemoteUpdate) return;
             try {
                 const activeDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'active_practice', 'current');
-                
-                const payload = {
+                await setDoc(activeDocRef, {
                     date: document.getElementById('practiceDate').value,
                     startTime: document.getElementById('startTime').value,
                     gear: document.getElementById('gearSelect').value,
@@ -388,19 +435,14 @@ html
                     syncedTimer: timerDataToUpdate || window.syncedTimer,
                     lastUpdatedBy: currentUser.uid,
                     lastUpdatedAt: new Date().toISOString()
-                };
-
-                await setDoc(activeDocRef, payload);
+                });
             } catch (err) {
                 console.error("Cloud sync error:", err);
             }
         };
 
         window.saveCurrentPractice = async function() {
-            if (!currentUser) {
-                showToast("Connecting to cloud...", false);
-                return;
-            }
+            if (!currentUser) return showToast("Connecting...", false);
 
             const practiceData = {
                 date: document.getElementById('practiceDate').value,
@@ -422,25 +464,20 @@ html
                 showToast("Saved to Staff Log!", true);
             } catch (err) {
                 console.error("Save error:", err);
-                showToast("Save failed", false);
             }
         };
 
         window.deleteHistoryRecord = async function(docId) {
             if (!currentUser) return;
-            showConfirmModal("Delete this record from shared staff history?", async () => {
-                try {
-                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'practice_history', docId);
-                    await deleteDoc(docRef);
-                    showToast("Record Deleted!", true);
-                } catch (err) {
-                    console.error("Delete error:", err);
-                }
+            showConfirmModal("Delete record from history?", async () => {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'practice_history', docId);
+                await deleteDoc(docRef);
+                showToast("Record Deleted!", true);
             });
         };
     </script>
 
-    <!-- Main Application UI & Timer Sync Mechanics -->
+    <!-- Main Application UI Logic -->
     <script>
         const DEFAULT_PRACTICE_BLOCKS = [
             { id: 1, title: "Warm Up", duration: 10, isFixed: true, options: ["Dynamic Warmup"], selectedDrills: ["Dynamic Warmup"], customNotes: "", attachedFiles: [] },
@@ -456,6 +493,8 @@ html
         window.activePeriodIndex = 0;
         window.timerSeconds = 600;
         window.timerInterval = null;
+        window.injuryInterval = null;
+        window.isMasterOperator = true;
 
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('practiceDate').valueAsDate = new Date();
@@ -465,6 +504,169 @@ html
             renderSchedule();
             lucide.createIcons();
         });
+
+        // Weather API Integration
+        async function fetchLiveWeather() {
+            try {
+                showToast("Fetching local weather...", true);
+                const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=40.80&longitude=-81.70&current=temperature_2m,relative_humidity_2m&temperature_unit=fahrenheit');
+                const data = await res.json();
+                
+                if (data && data.current) {
+                    const temp = Math.round(data.current.temperature_2m);
+                    const humidity = data.current.relative_humidity_2m;
+                    
+                    // Simple Heat Index approximation
+                    const heatIndex = Math.round(temp + (0.05 * humidity));
+                    
+                    let zoneText = "Normal Conditions";
+                    let selectVal = "normal";
+
+                    if (heatIndex >= 88) {
+                        zoneText = "EXTREME HEAT WARNING";
+                        selectVal = "extreme";
+                    } else if (heatIndex >= 85) {
+                        zoneText = "HIGH HEAT WARNING";
+                        selectVal = "high";
+                    } else if (heatIndex >= 80) {
+                        zoneText = "ELEVATED HEAT CAUTION";
+                        selectVal = "elevated";
+                    }
+
+                    document.getElementById('weatherReadout').textContent = `${temp}°F (${humidity}% Humidity) • ${zoneText}`;
+                    document.getElementById('heatIndexSelect').value = selectVal;
+                    showToast(`Weather Updated: ${temp}°F`, true);
+                }
+            } catch (err) {
+                showToast("Weather fetch failed, set manually", false);
+            }
+        }
+
+        function applyHeatProtocol() {
+            const heatLevel = document.getElementById('heatIndexSelect').value;
+            let cleanPeriods = window.periods.filter(p => p.title !== "WATER / SHADE BREAK");
+
+            let intervalMins = 30;
+            let breakDuration = 4;
+
+            if (heatLevel === "elevated") {
+                intervalMins = 20;
+                breakDuration = 4;
+            } else if (heatLevel === "high") {
+                intervalMins = 20;
+                breakDuration = 5;
+            } else if (heatLevel === "extreme") {
+                intervalMins = 15;
+                breakDuration = 5;
+            } else {
+                showToast("Normal weather rules restored.", true);
+                window.periods = cleanPeriods;
+                renderSchedule();
+                if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
+                return;
+            }
+
+            let newSchedule = [];
+            let accumulatedMins = 0;
+
+            cleanPeriods.forEach((period) => {
+                newSchedule.push(period);
+                accumulatedMins += parseInt(period.duration) || 0;
+
+                if (accumulatedMins >= intervalMins && period.title !== "Warm Up" && period.title !== "Team Announcements") {
+                    newSchedule.push({
+                        id: Date.now() + Math.random(),
+                        title: "WATER / SHADE BREAK",
+                        duration: breakDuration,
+                        isFixed: false,
+                        options: ["Hydration & Helmets Off", "Ice Towels"],
+                        selectedDrills: ["Hydration & Helmets Off"],
+                        customNotes: "Mandatory Weather Hydration Protocol",
+                        attachedFiles: []
+                    });
+                    accumulatedMins = 0;
+                }
+            });
+
+            window.periods = newSchedule;
+            renderSchedule();
+            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
+            showToast(`Inserted Hydration Breaks (${breakDuration} mins)!`, true);
+        }
+
+        // Injury Delay Mechanics
+        function triggerInjuryTimeout() {
+            if (!window.isMasterOperator) return;
+            const updatedTimer = {
+                activePeriodIndex: window.activePeriodIndex,
+                isRunning: false,
+                endTimeMs: 0,
+                remainingSeconds: window.timerSeconds,
+                isInjuryTimeout: true,
+                injuryStartMs: Date.now()
+            };
+            window.syncedTimer = updatedTimer;
+            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
+        }
+
+        function resumeFromInjury(shiftSchedule = false) {
+            if (!window.isMasterOperator) return;
+            
+            const elapsedSecs = Math.round((Date.now() - (window.syncedTimer.injuryStartMs || Date.now())) / 1000);
+            const elapsedMins = Math.ceil(elapsedSecs / 60);
+
+            if (shiftSchedule && elapsedMins > 0) {
+                // Add injury delay to end time or shift practice start time
+                const startInput = document.getElementById('startTime').value || "15:00";
+                const [startHour, startMin] = startInput.split(':').map(Number);
+                let newTime = new Date();
+                newTime.setHours(startHour, startMin + elapsedMins, 0, 0);
+                
+                let hrs = newTime.getHours().toString().padStart(2, '0');
+                let mins = newTime.getMinutes().toString().padStart(2, '0');
+                document.getElementById('startTime').value = `${hrs}:${mins}`;
+                showToast(`Shifted remaining schedule by +${elapsedMins} mins`, true);
+            }
+
+            const updatedTimer = {
+                activePeriodIndex: window.activePeriodIndex,
+                isRunning: false,
+                endTimeMs: 0,
+                remainingSeconds: window.timerSeconds,
+                isInjuryTimeout: false,
+                injuryStartMs: 0
+            };
+            window.syncedTimer = updatedTimer;
+            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
+        }
+
+        function startInjuryTick() {
+            if (window.injuryInterval) clearInterval(window.injuryInterval);
+
+            window.injuryInterval = setInterval(() => {
+                if (window.syncedTimer.isInjuryTimeout) {
+                    const elapsedSecs = Math.max(0, Math.round((Date.now() - window.syncedTimer.injuryStartMs) / 1000));
+                    const mins = Math.floor(elapsedSecs / 60);
+                    const secs = elapsedSecs % 60;
+                    document.getElementById('injuryTimerDisplay').textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                }
+            }, 1000);
+        }
+
+        function toggleMasterRole(isMaster) {
+            window.isMasterOperator = isMaster;
+            document.getElementById('roleLabel').textContent = isMaster ? "Master Clock Operator" : "Assistant (View Only)";
+            
+            const controlBtns = ['playPauseBtn', 'resetBtn', 'nextBtn', 'prevBtn', 'injuryBtn'];
+            controlBtns.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.disabled = !isMaster;
+                    el.classList.toggle('opacity-40', !isMaster);
+                    el.classList.toggle('cursor-not-allowed', !isMaster);
+                }
+            });
+        }
 
         function calculateTimes() {
             const startInput = document.getElementById('startTime').value || "15:00";
@@ -482,11 +684,7 @@ html
                 currentTime.setMinutes(currentTime.getMinutes() + dur);
                 const endTimeStr = formatTime(currentTime);
 
-                return {
-                    ...p,
-                    startTimeStr,
-                    endTimeStr
-                };
+                return { ...p, startTimeStr, endTimeStr };
             });
 
             document.getElementById('totalTimeBadge').textContent = `Total: ${totalMinutes} mins`;
@@ -497,8 +695,7 @@ html
             let hours = dateObj.getHours();
             let minutes = dateObj.getMinutes();
             const ampm = hours >= 12 ? 'PM' : 'AM';
-            hours = hours % 12;
-            hours = hours ? hours : 12;
+            hours = hours % 12 || 12;
             minutes = minutes < 10 ? '0' + minutes : minutes;
             return `${hours}:${minutes} ${ampm}`;
         }
@@ -514,14 +711,17 @@ html
                 const idx = actualIdx + 1;
                 const optionsList = period.options || [];
                 const filesList = period.attachedFiles || [];
+                const isWaterBreak = period.title === "WATER / SHADE BREAK";
 
                 const card = document.createElement('div');
-                card.className = "bg-white rounded-xl border border-slate-200 p-3 shadow-2xs hover:border-slate-300 transition print-card space-y-3";
+                card.className = `rounded-xl border p-3 shadow-2xs transition print-card space-y-3 ${
+                    isWaterBreak ? 'bg-cyan-50/80 border-cyan-300' : 'bg-white border-slate-200 hover:border-slate-300'
+                }`;
 
                 card.innerHTML = `
                     <div class="flex flex-wrap justify-between items-center gap-2 pb-2 border-b border-slate-100">
                         <div class="flex items-center gap-2">
-                            <span class="bg-slate-900 text-white text-[11px] font-black px-2 py-0.5 rounded">
+                            <span class="${isWaterBreak ? 'bg-cyan-700' : 'bg-slate-900'} text-white text-[11px] font-black px-2 py-0.5 rounded">
                                 #${idx}
                             </span>
                             <input type="text" value="${escapeHtml(period.title)}" onchange="updatePeriodTitle(${idx}, this.value)" class="font-extrabold text-slate-800 text-sm bg-transparent focus:bg-slate-50 focus:outline-none rounded px-1">
@@ -539,7 +739,7 @@ html
                                 <button onclick="adjustTime(${idx}, 5)" class="no-print hover:bg-white text-slate-700 px-2 py-0.5 rounded font-black text-xs transition">+5</button>
                             </div>
 
-                            <button onclick="openTimerModalForPeriod(${idx})" class="no-print bg-amber-400 hover:bg-amber-300 text-slate-950 p-1 rounded-lg text-xs font-bold transition" title="Start Timer">
+                            <button onclick="openTimerModalForPeriod(${idx})" class="no-print bg-amber-400 hover:bg-amber-300 text-slate-950 p-1 rounded-lg text-xs font-bold transition">
                                 <i data-lucide="timer" class="w-4 h-4"></i>
                             </button>
 
@@ -549,29 +749,19 @@ html
                         </div>
                     </div>
 
-                    <!-- Quick Drill Tag Options -->
                     <div>
                         <div class="flex justify-between items-center mb-1">
-                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-wider">
-                                Quick Select Tag:
-                            </label>
-                            <button onclick="addDrillOptionPrompt(${idx})" class="no-print text-emerald-600 text-[11px] font-bold flex items-center gap-1">
-                                + Add Tag
-                            </button>
+                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Quick Select Tag:</label>
+                            <button onclick="addDrillOptionPrompt(${idx})" class="no-print text-emerald-600 text-[11px] font-bold flex items-center gap-1">+ Add Tag</button>
                         </div>
 
                         <div class="flex flex-wrap gap-1.5">
                             ${optionsList.map(drill => {
                                 const isSelected = (period.selectedDrills || []).includes(drill);
                                 return `
-                                    <button 
-                                        onclick="selectDrill(${idx}, '${escapeHtml(drill)}')" 
-                                        class="text-xs px-2.5 py-1 rounded-lg font-bold border transition ${
-                                            isSelected 
-                                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs' 
-                                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                                        }"
-                                    >
+                                    <button onclick="selectDrill(${idx}, '${escapeHtml(drill)}')" class="text-xs px-2.5 py-1 rounded-lg font-bold border transition ${
+                                        isSelected ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                                    }">
                                         ${isSelected ? '✓ ' : ''}${escapeHtml(drill)}
                                     </button>
                                 `;
@@ -579,26 +769,8 @@ html
                         </div>
                     </div>
 
-                    <!-- Coaching Script / Notes Field -->
                     <div class="flex items-center gap-2">
-                        <input type="text" value="${escapeHtml(period.customNotes || '')}" onchange="updatePeriodNotes(${idx}, this.value)" placeholder="Specific coaching points / play script details..." class="w-full text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-800 focus:outline-none focus:border-emerald-500">
-                    </div>
-
-                    <!-- Attachments Bar -->
-                    <div class="pt-1.5 border-t border-slate-100 flex items-center justify-between">
-                        <div class="flex items-center gap-2 flex-wrap">
-                            ${filesList.map((file, fileIdx) => `
-                                <div class="bg-slate-100 border border-slate-200 rounded-md px-2 py-0.5 text-[10px] font-bold text-slate-700 flex items-center gap-1">
-                                    <span>📎 ${escapeHtml(file.name)}</span>
-                                    <button onclick="removeAttachedFile(${idx}, ${fileIdx})" class="no-print text-slate-400 hover:text-rose-500">✕</button>
-                                </div>
-                            `).join('')}
-                        </div>
-
-                        <label class="no-print cursor-pointer text-[11px] font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-lg transition flex items-center gap-1">
-                            <i data-lucide="paperclip" class="w-3 h-3"></i> Attach File
-                            <input type="file" class="hidden" accept="*/*" onchange="handleFileUpload(${idx}, this)">
-                        </label>
+                        <input type="text" value="${escapeHtml(period.customNotes || '')}" onchange="updatePeriodNotes(${idx}, this.value)" placeholder="Coaching script / play details..." class="w-full text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-800 focus:outline-none focus:border-emerald-500">
                     </div>
                 `;
 
@@ -649,38 +821,6 @@ html
             if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
         }
 
-        function handleFileUpload(periodIdx, inputElement) {
-            const file = inputElement.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                if (!window.periods[periodIdx].attachedFiles) {
-                    window.periods[periodIdx].attachedFiles = [];
-                }
-
-                window.periods[periodIdx].attachedFiles.push({
-                    name: file.name,
-                    type: file.type || 'application/octet-stream',
-                    size: file.size,
-                    dataUrl: e.target.result
-                });
-
-                inputElement.value = ''; 
-                renderSchedule();
-                if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function removeAttachedFile(periodIdx, fileIdx) {
-            if (window.periods[periodIdx].attachedFiles) {
-                window.periods[periodIdx].attachedFiles.splice(fileIdx, 1);
-                renderSchedule();
-                if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
-            }
-        }
-
         function deletePeriod(idx) {
             window.periods.splice(idx, 1);
             renderSchedule();
@@ -702,7 +842,7 @@ html
             if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
         }
 
-        // --- Real-time Synchronized Sideline Timer Controls ---
+        // --- Sideline Timer Logic ---
         function openTimerModal() {
             openTimerModalForPeriod(window.activePeriodIndex || 0);
         }
@@ -715,6 +855,7 @@ html
             window.timerSeconds = (parseInt(current.duration) || 0) * 60;
             
             setupTimerPeriodDisplay();
+            toggleMasterRole(window.isMasterOperator);
             
             document.getElementById('timerModal').classList.remove('hidden');
             document.getElementById('timerModal').classList.add('flex');
@@ -764,27 +905,28 @@ html
         }
 
         function toggleSyncedTimer() {
+            if (!window.isMasterOperator) return;
             const isCurrentlyRunning = window.syncedTimer.isRunning;
             const now = Date.now();
 
             if (!isCurrentlyRunning) {
-                // Coach pressed START
                 const endTimeMs = now + (window.timerSeconds * 1000);
                 const updatedTimer = {
                     activePeriodIndex: window.activePeriodIndex,
                     isRunning: true,
                     endTimeMs: endTimeMs,
-                    remainingSeconds: window.timerSeconds
+                    remainingSeconds: window.timerSeconds,
+                    isInjuryTimeout: false
                 };
                 window.syncedTimer = updatedTimer;
                 if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
             } else {
-                // Coach pressed PAUSE
                 const updatedTimer = {
                     activePeriodIndex: window.activePeriodIndex,
                     isRunning: false,
                     endTimeMs: 0,
-                    remainingSeconds: window.timerSeconds
+                    remainingSeconds: window.timerSeconds,
+                    isInjuryTimeout: false
                 };
                 window.syncedTimer = updatedTimer;
                 if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
@@ -792,6 +934,7 @@ html
         }
 
         function resetSyncedTimer() {
+            if (!window.isMasterOperator) return;
             const current = window.periods[window.activePeriodIndex];
             const secs = (parseInt(current?.duration) || 0) * 60;
             
@@ -799,13 +942,15 @@ html
                 activePeriodIndex: window.activePeriodIndex,
                 isRunning: false,
                 endTimeMs: 0,
-                remainingSeconds: secs
+                remainingSeconds: secs,
+                isInjuryTimeout: false
             };
             window.syncedTimer = updatedTimer;
             if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
         }
 
         function nextSyncedPeriod() {
+            if (!window.isMasterOperator) return;
             if (window.activePeriodIndex < window.periods.length - 1) {
                 const nextIdx = window.activePeriodIndex + 1;
                 const nextPeriodObj = window.periods[nextIdx];
@@ -815,7 +960,8 @@ html
                     activePeriodIndex: nextIdx,
                     isRunning: false,
                     endTimeMs: 0,
-                    remainingSeconds: secs
+                    remainingSeconds: secs,
+                    isInjuryTimeout: false
                 };
                 window.syncedTimer = updatedTimer;
                 if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
@@ -824,11 +970,30 @@ html
             }
         }
 
+        function prevSyncedPeriod() {
+            if (!window.isMasterOperator) return;
+            if (window.activePeriodIndex > 0) {
+                const prevIdx = window.activePeriodIndex - 1;
+                const prevPeriodObj = window.periods[prevIdx];
+                const secs = (parseInt(prevPeriodObj?.duration) || 0) * 60;
+
+                const updatedTimer = {
+                    activePeriodIndex: prevIdx,
+                    isRunning: false,
+                    endTimeMs: 0,
+                    remainingSeconds: secs,
+                    isInjuryTimeout: false
+                };
+                window.syncedTimer = updatedTimer;
+                if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
+            }
+        }
+
         function startLocalTimerTick() {
             if (window.timerInterval) clearInterval(window.timerInterval);
 
             window.timerInterval = setInterval(() => {
-                if (window.syncedTimer.isRunning) {
+                if (window.syncedTimer.isRunning && !window.syncedTimer.isInjuryTimeout) {
                     const now = Date.now();
                     const remaining = Math.max(0, Math.round((window.syncedTimer.endTimeMs - now) / 1000));
                     window.timerSeconds = remaining;
@@ -838,7 +1003,7 @@ html
                         clearInterval(window.timerInterval);
                         window.timerInterval = null;
                         playWhistle();
-                        nextSyncedPeriod();
+                        if (window.isMasterOperator) nextSyncedPeriod();
                     }
                 }
             }, 1000);
@@ -890,9 +1055,7 @@ html
         }
 
         function showConfirmModal(msg, onConfirm) {
-            if (confirm(msg)) {
-                onConfirm();
-            }
+            if (confirm(msg)) onConfirm();
         }
 
         function escapeHtml(str) {
