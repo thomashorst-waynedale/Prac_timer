@@ -194,7 +194,7 @@
                         <p class="text-xs text-slate-500 font-medium">Timeline log of saved practices</p>
                     </div>
                 </div>
-                <button onclick="toggleHistoryModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                <button onclick="toggleHistoryModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg transition">
                     <i data-lucide="x" class="w-5 h-5"></i>
                 </button>
             </div>
@@ -211,7 +211,7 @@
         </div>
     </div>
 
-    <!-- Live Synced Sideline Timer Modal with Transition Water Break Overlay -->
+    <!-- Live Synced Sideline Timer Modal -->
     <div id="timerModal" class="fixed inset-0 bg-slate-950 z-50 hidden flex-col justify-between p-6 text-white no-print">
         <div class="flex justify-between items-center max-w-4xl mx-auto w-full border-b border-slate-800 pb-3">
             <div class="flex items-center gap-3">
@@ -251,7 +251,7 @@
                 <div class="font-mono text-4xl font-black text-cyan-100" id="waterOverrideDisplay">04:00</div>
                 <p class="text-xs font-medium text-cyan-100">Transition Break Active • Helmets Off & Hydrate before next block.</p>
                 <div class="flex justify-center gap-2 pt-1">
-                    <button onclick="endWaterBreakOverride()" class="bg-white text-cyan-950 text-xs font-black px-4 py-1.5 rounded-lg shadow-md hover:bg-cyan-50">Start Next Drill Now</button>
+                    <button onclick="endWaterBreakOverride()" class="bg-white text-cyan-950 text-xs font-black px-4 py-1.5 rounded-lg shadow-md hover:bg-cyan-50 transition">Start Next Drill Now</button>
                 </div>
             </div>
 
@@ -263,12 +263,12 @@
                 <div class="font-mono text-3xl font-black text-amber-200" id="injuryTimerDisplay">00:00</div>
                 <p class="text-xs font-medium text-rose-100">Practice clock is paused across all staff devices.</p>
                 <div class="flex justify-center gap-2 pt-2">
-                    <button onclick="resumeFromInjury(false)" class="bg-white text-rose-950 text-xs font-black px-3 py-1.5 rounded-lg">Resume Practice</button>
-                    <button onclick="resumeFromInjury(true)" class="bg-amber-400 text-slate-950 text-xs font-black px-3 py-1.5 rounded-lg">Resume & Shift Rest of Schedule</button>
+                    <button onclick="resumeFromInjury(false)" class="bg-white text-rose-950 text-xs font-black px-3 py-1.5 rounded-lg transition">Resume Practice</button>
+                    <button onclick="resumeFromInjury(true)" class="bg-amber-400 text-slate-950 text-xs font-black px-3 py-1.5 rounded-lg transition">Resume & Shift Rest of Schedule</button>
                 </div>
             </div>
 
-            <div id="normalTimerCard" class="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 shadow-2xl backdrop-blur-md">
+            <div id="normalTimerCard" class="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 shadow-2xl backdrop-blur-md transition-opacity duration-300">
                 <div id="bigTimerDisplay" class="font-mono text-7xl md:text-9xl font-black text-amber-400 tracking-wider leading-none">
                     10:00
                 </div>
@@ -371,7 +371,7 @@
                 snapshot.forEach(docSnap => list.push({ id: docSnap.id, ...docSnap.data() }));
                 list.sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
                 window.savedHistory = list;
-                renderHistoryList();
+                if (typeof window.renderHistoryList === 'function') window.renderHistoryList();
             }, (err) => console.error("History snapshot error:", err));
 
             const activeDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'active_practice', 'current');
@@ -391,26 +391,778 @@
                         if (data.periods && Array.isArray(data.periods)) {
                             window.periods = JSON.parse(JSON.stringify(data.periods));
                         }
-                        renderSchedule();
+                        if (typeof window.renderSchedule === 'function') window.renderSchedule();
                         isRemoteUpdate = false;
                     }
 
-                    if (data.syncedTimer) {
-                        handleIncomingSyncedTimer(data.syncedTimer);
+                    if (data.syncedTimer && typeof window.handleIncomingSyncedTimer === 'function') {
+                        window.handleIncomingSyncedTimer(data.syncedTimer);
                     }
                 }
             }, (err) => console.error("Live active practice snapshot error:", err));
         }
 
-        function handleIncomingSyncedTimer(incoming) {
+        // Expose Cloud Functions to global window object
+        window.syncActivePracticeToCloud = async function(timerDataToUpdate = null) {
+            if (!currentUser || isRemoteUpdate) return;
+            try {
+                const activeDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'active_practice', 'current');
+                await setDoc(activeDocRef, {
+                    date: document.getElementById('practiceDate').value,
+                    startTime: document.getElementById('startTime').value,
+                    gear: document.getElementById('gearSelect').value,
+                    todayFocus: document.getElementById('todayFocus').value,
+                    yesterdayGood: document.getElementById('yesterdayGood').value,
+                    yesterdayBad: document.getElementById('yesterdayBad').value,
+                    staffNotes: document.getElementById('staffNotes').value,
+                    totalMinutes: typeof window.calculateTimes === 'function' ? window.calculateTimes().totalMinutes : 0,
+                    periods: window.periods || [],
+                    syncedTimer: timerDataToUpdate || window.syncedTimer,
+                    lastUpdatedBy: currentUser.uid,
+                    lastUpdatedAt: new Date().toISOString()
+                });
+            } catch (err) {
+                console.error("Cloud sync error:", err);
+            }
+        };
+
+        window.saveCurrentPractice = async function() {
+            if (!currentUser) return typeof window.showToast === 'function' ? window.showToast("Connecting to cloud...", false) : null;
+
+            const practiceData = {
+                date: document.getElementById('practiceDate').value,
+                startTime: document.getElementById('startTime').value,
+                gear: document.getElementById('gearSelect').value,
+                todayFocus: document.getElementById('todayFocus').value,
+                yesterdayGood: document.getElementById('yesterdayGood').value,
+                yesterdayBad: document.getElementById('yesterdayBad').value,
+                staffNotes: document.getElementById('staffNotes').value,
+                totalMinutes: typeof window.calculateTimes === 'function' ? window.calculateTimes().totalMinutes : 0,
+                periods: window.periods || [],
+                createdAt: new Date().toISOString(),
+                createdBy: currentUser.uid
+            };
+
+            try {
+                const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'practice_history');
+                await addDoc(colRef, practiceData);
+                if (typeof window.showToast === 'function') window.showToast("Saved to Staff Log!", true);
+            } catch (err) {
+                console.error("Save error:", err);
+            }
+        };
+
+        window.deleteHistoryRecord = async function(docId) {
+            if (!currentUser) return;
+            if (typeof window.showConfirmModal === 'function') {
+                window.showConfirmModal("Delete record from history?", async () => {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'practice_history', docId);
+                    await deleteDoc(docRef);
+                    if (typeof window.showToast === 'function') window.showToast("Record Deleted!", true);
+                });
+            }
+        };
+    </script>
+
+    <!-- Main Application UI Logic -->
+    <script>
+        // Fallbacks: If Firebase fails to load or isn't connected, ensure UI buttons don't crash
+        if (typeof window.syncActivePracticeToCloud !== 'function') {
+            window.syncActivePracticeToCloud = async function() { console.log("Local mode active: Cloud sync disabled."); };
+        }
+        if (typeof window.saveCurrentPractice !== 'function') {
+            window.saveCurrentPractice = async function() { showToast("Local Mode: Connect DB to save practice history.", false); };
+        }
+        if (typeof window.deleteHistoryRecord !== 'function') {
+            window.deleteHistoryRecord = async function() { console.log("Local mode active: Delete disabled."); };
+        }
+
+        const DEFAULT_PRACTICE_BLOCKS = [
+            { id: 1, title: "Warm Up", duration: 10, isFixed: true, options: ["Dynamic Warmup"], selectedDrills: ["Dynamic Warmup"], customNotes: "", attachedFiles: [] },
+            { id: 2, title: "Blood Pumper", duration: 10, isFixed: false, options: ["Take Off", "Pursuit", "Other"], selectedDrills: ["Take Off"], customNotes: "", attachedFiles: [] },
+            { id: 3, title: "Indy / Group", duration: 20, isFixed: false, options: ["O Indy", "D Indy", "Form Rec", "Install"], selectedDrills: ["O Indy"], customNotes: "", attachedFiles: [] },
+            { id: 4, title: "Stations / Team Build", duration: 20, isFixed: false, options: ["Ball Skills", "Blocking", "Tackling", "Team Builder"], selectedDrills: ["Ball Skills"], customNotes: "", attachedFiles: [] },
+            { id: 5, title: "Group / Team", duration: 30, isFixed: false, options: ["7 on 7 with Inside Run", "Team"], selectedDrills: ["7 on 7 with Inside Run"], customNotes: "", attachedFiles: [] },
+            { id: 6, title: "Conditioning", duration: 15, isFixed: false, options: ["10 10s", "Gassers", "Fartlek", "Champions"], selectedDrills: ["10 10s"], customNotes: "", attachedFiles: [] },
+            { id: 7, title: "Team Announcements", duration: 15, isFixed: false, options: ["Game Prep", "Equipment Check", "Next Practice Info", "Parent/Roster Reminders"], selectedDrills: ["Game Prep"], customNotes: "", attachedFiles: [] }
+        ];
+
+        window.periods = JSON.parse(JSON.stringify(DEFAULT_PRACTICE_BLOCKS));
+        window.activePeriodIndex = 0;
+        window.timerSeconds = 600;
+        window.timerInterval = null;
+        window.injuryInterval = null;
+        window.waterInterval = null;
+        window.isMasterOperator = true;
+        window.waterBreakIntervalMins = 30;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('practiceDate').valueAsDate = new Date();
+            document.getElementById('todayFocus').value = "Execution & Fundamentals";
+            document.getElementById('yesterdayGood').value = "Great hustle during 7v7";
+            document.getElementById('yesterdayBad').value = "Tackling angles & Huddle tempo";
+            renderSchedule();
+            lucide.createIcons();
+        });
+
+        // --- History Modal Functions (RESTORED) ---
+        window.toggleHistoryModal = function() {
+            const modal = document.getElementById('historyModal');
+            if (modal.classList.contains('hidden')) {
+                modal.classList.remove('hidden');
+                renderHistoryList();
+            } else {
+                modal.classList.add('hidden');
+            }
+        };
+
+        window.renderHistoryList = function() {
+            const container = document.getElementById('historyListContainer');
+            const searchInput = document.getElementById('historySearchInput');
+            const countBadge = document.getElementById('historyCountBadge');
+            
+            if (!container) return;
+            container.innerHTML = '';
+            
+            const search = (searchInput?.value || "").toLowerCase();
+            const historyData = window.savedHistory || [];
+            
+            const filtered = historyData.filter(h => 
+                (h.todayFocus || "").toLowerCase().includes(search) || 
+                (h.date || "").includes(search)
+            );
+            
+            if (countBadge) countBadge.textContent = `${filtered.length} Saved`;
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="text-center text-slate-400 text-xs py-5 font-bold">No saved practices found.</div>`;
+                return;
+            }
+
+            filtered.forEach(record => {
+                const div = document.createElement('div');
+                div.className = "bg-slate-50 border border-slate-200 rounded-xl p-3 flex justify-between items-center transition hover:bg-slate-100";
+                div.innerHTML = `
+                    <div>
+                        <div class="text-xs font-black text-slate-800">${escapeHtml(record.date || 'No Date')} • ${escapeHtml(record.startTime || '')}</div>
+                        <div class="text-[11px] text-slate-500 font-medium mt-0.5">Focus: ${escapeHtml(record.todayFocus || 'N/A')}</div>
+                    </div>
+                    <button onclick="window.deleteHistoryRecord('${record.id}')" class="text-rose-500 hover:bg-rose-100 p-2 rounded-lg transition" title="Delete Record">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                `;
+                container.appendChild(div);
+            });
+            lucide.createIcons();
+        };
+
+        // Weather API Auto Integration
+        window.fetchLiveWeather = async function() {
+            try {
+                showToast("Fetching local weather...", true);
+                const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=40.80&longitude=-81.70&current=temperature_2m,relative_humidity_2m&temperature_unit=fahrenheit');
+                const data = await res.json();
+                
+                if (data && data.current) {
+                    const temp = Math.round(data.current.temperature_2m);
+                    const humidity = data.current.relative_humidity_2m;
+                    const heatIndex = Math.round(temp + (0.05 * humidity));
+                    
+                    let zoneText = "Normal Conditions (Break between periods ~30m)";
+                    let selectVal = "normal";
+
+                    if (heatIndex >= 88) {
+                        zoneText = "EXTREME HEAT (Break between periods ~10m)";
+                        selectVal = "extreme";
+                    } else if (heatIndex >= 85) {
+                        zoneText = "HIGH HEAT (Break between periods ~15m)";
+                        selectVal = "high";
+                    } else if (heatIndex >= 80) {
+                        zoneText = "ELEVATED HEAT (Break between periods ~20m)";
+                        selectVal = "elevated";
+                    }
+
+                    document.getElementById('weatherReadout').textContent = `${temp}°F (${humidity}% Humidity) • ${zoneText}`;
+                    document.getElementById('heatIndexSelect').value = selectVal;
+                    updateWeatherRules();
+                    showToast(`Weather Rules Set: ${temp}°F`, true);
+                    if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
+                }
+            } catch (err) {
+                showToast("Weather fetch failed, set manually", false);
+            }
+        };
+
+        window.updateWeatherRules = function() {
+            const level = document.getElementById('heatIndexSelect').value;
+            if (level === "extreme") window.waterBreakIntervalMins = 10;
+            else if (level === "high") window.waterBreakIntervalMins = 15;
+            else if (level === "elevated") window.waterBreakIntervalMins = 20;
+            else window.waterBreakIntervalMins = 30;
+            
+            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
+        };
+
+        // Trigger Transition Water Break
+        window.triggerTransitionWaterBreak = function() {
+            if (!window.isMasterOperator) return;
+            const breakSecs = 240; // 4 minutes
+            const updatedTimer = {
+                activePeriodIndex: window.activePeriodIndex,
+                isRunning: false,
+                endTimeMs: 0,
+                remainingSeconds: window.timerSeconds,
+                isInjuryTimeout: false,
+                isWaterOverride: true,
+                waterEndMs: Date.now() + (breakSecs * 1000),
+                continuousFieldSecs: 0,
+                waterBreakPending: false
+            };
+            window.syncedTimer = updatedTimer;
+            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
+            playWhistle();
+        };
+
+        window.endWaterBreakOverride = function() {
+            if (!window.isMasterOperator) return;
+
+            const updatedTimer = {
+                activePeriodIndex: window.activePeriodIndex,
+                isRunning: false,
+                endTimeMs: 0,
+                remainingSeconds: window.timerSeconds,
+                isWaterOverride: false,
+                waterEndMs: 0,
+                continuousFieldSecs: 0,
+                waterBreakPending: false
+            };
+            window.syncedTimer = updatedTimer;
+            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
+            playWhistle();
+        };
+
+        window.startWaterOverrideTick = function() {
+            if (window.waterInterval) clearInterval(window.waterInterval);
+
+            window.waterInterval = setInterval(() => {
+                if (window.syncedTimer.isWaterOverride) {
+                    const remaining = Math.max(0, Math.round((window.syncedTimer.waterEndMs - Date.now()) / 1000));
+                    const mins = Math.floor(remaining / 60);
+                    const secs = remaining % 60;
+                    document.getElementById('waterOverrideDisplay').textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+                    if (remaining <= 0) {
+                        clearInterval(window.waterInterval);
+                        window.waterInterval = null;
+                        playWhistle();
+                        if (window.isMasterOperator) endWaterBreakOverride();
+                    }
+                }
+            }, 1000);
+        };
+
+        // Injury Delay Mechanics
+        window.triggerInjuryTimeout = function() {
+            if (!window.isMasterOperator) return;
+            const updatedTimer = {
+                activePeriodIndex: window.activePeriodIndex,
+                isRunning: false,
+                endTimeMs: 0,
+                remainingSeconds: window.timerSeconds,
+                isInjuryTimeout: true,
+                injuryStartMs: Date.now(),
+                isWaterOverride: false
+            };
+            window.syncedTimer = updatedTimer;
+            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
+        };
+
+        window.resumeFromInjury = function(shiftSchedule = false) {
+            if (!window.isMasterOperator) return;
+            
+            const elapsedSecs = Math.round((Date.now() - (window.syncedTimer.injuryStartMs || Date.now())) / 1000);
+            const elapsedMins = Math.ceil(elapsedSecs / 60);
+
+            if (shiftSchedule && elapsedMins > 0) {
+                const startInput = document.getElementById('startTime').value || "15:00";
+                const [startHour, startMin] = startInput.split(':').map(Number);
+                let newTime = new Date();
+                newTime.setHours(startHour, startMin + elapsedMins, 0, 0);
+                
+                let hrs = newTime.getHours().toString().padStart(2, '0');
+                let mins = newTime.getMinutes().toString().padStart(2, '0');
+                document.getElementById('startTime').value = `${hrs}:${mins}`;
+                showToast(`Shifted remaining schedule by +${elapsedMins} mins`, true);
+            }
+
+            const updatedTimer = {
+                activePeriodIndex: window.activePeriodIndex,
+                isRunning: false,
+                endTimeMs: 0,
+                remainingSeconds: window.timerSeconds,
+                isInjuryTimeout: false,
+                injuryStartMs: 0
+            };
+            window.syncedTimer = updatedTimer;
+            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
+        };
+
+        window.startInjuryTick = function() {
+            if (window.injuryInterval) clearInterval(window.injuryInterval);
+
+            window.injuryInterval = setInterval(() => {
+                if (window.syncedTimer.isInjuryTimeout) {
+                    const elapsedSecs = Math.max(0, Math.round((Date.now() - window.syncedTimer.injuryStartMs) / 1000));
+                    const mins = Math.floor(elapsedSecs / 60);
+                    const secs = elapsedSecs % 60;
+                    document.getElementById('injuryTimerDisplay').textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                }
+            }, 1000);
+        };
+
+        window.toggleMasterRole = function(isMaster) {
+            window.isMasterOperator = isMaster;
+            document.getElementById('roleLabel').textContent = isMaster ? "Master Clock Operator" : "Assistant (View Only)";
+            
+            const controlBtns = ['playPauseBtn', 'resetBtn', 'nextBtn', 'prevBtn', 'injuryBtn'];
+            controlBtns.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.disabled = !isMaster;
+                    el.classList.toggle('opacity-40', !isMaster);
+                    el.classList.toggle('cursor-not-allowed', !isMaster);
+                }
+            });
+        };
+
+        window.calculateTimes = function() {
+            const startInput = document.getElementById('startTime').value || "15:00";
+            const [startHour, startMin] = startInput.split(':').map(Number);
+            let currentTime = new Date();
+            currentTime.setHours(startHour, startMin, 0, 0);
+
+            let totalMinutes = 0;
+
+            const timeMapped = window.periods.map(p => {
+                const startTimeStr = formatTime(currentTime);
+                const dur = parseInt(p.duration) || 0;
+                totalMinutes += dur;
+
+                currentTime.setMinutes(currentTime.getMinutes() + dur);
+                const endTimeStr = formatTime(currentTime);
+
+                return { ...p, startTimeStr, endTimeStr };
+            });
+
+            document.getElementById('totalTimeBadge').textContent = `Total: ${totalMinutes} mins`;
+            return { timeMapped, totalMinutes };
+        };
+
+        function formatTime(dateObj) {
+            let hours = dateObj.getHours();
+            let minutes = dateObj.getMinutes();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12 || 12;
+            minutes = minutes < 10 ? '0' + minutes : minutes;
+            return `${hours}:${minutes} ${ampm}`;
+        }
+
+        window.renderSchedule = function() {
+            const { timeMapped } = calculateTimes();
+            const container = document.getElementById('periodsContainer');
+            container.innerHTML = '';
+
+            const editablePeriods = timeMapped.slice(1);
+
+            editablePeriods.forEach((period, actualIdx) => {
+                const idx = actualIdx + 1;
+                const optionsList = period.options || [];
+
+                const card = document.createElement('div');
+                card.className = "rounded-xl border p-3 shadow-2xs transition print-card space-y-3 bg-white border-slate-200 hover:border-slate-300";
+
+                card.innerHTML = `
+                    <div class="flex flex-wrap justify-between items-center gap-2 pb-2 border-b border-slate-100">
+                        <div class="flex items-center gap-2">
+                            <span class="bg-slate-900 text-white text-[11px] font-black px-2 py-0.5 rounded">
+                                #${idx}
+                            </span>
+                            <input type="text" value="${escapeHtml(period.title)}" onchange="updatePeriodTitle(${idx}, this.value)" class="font-extrabold text-slate-800 text-sm bg-transparent focus:bg-slate-50 focus:outline-none rounded px-1 w-32 md:w-auto">
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                                ${period.startTimeStr} - ${period.endTimeStr}
+                            </span>
+
+                            <div class="flex items-center gap-1 bg-slate-50 rounded-lg p-0.5 border border-slate-200">
+                                <button onclick="adjustTime(${idx}, -5)" class="no-print hover:bg-white text-slate-700 px-2 py-0.5 rounded font-black text-xs transition">-5</button>
+                                <input type="number" value="${period.duration}" min="0" onchange="updatePeriodDuration(${idx}, this.value)" class="w-10 text-center text-xs font-black bg-white rounded border border-slate-200 py-0.5 focus:outline-none">
+                                <span class="text-xs text-slate-400 font-bold pr-1">m</span>
+                                <button onclick="adjustTime(${idx}, 5)" class="no-print hover:bg-white text-slate-700 px-2 py-0.5 rounded font-black text-xs transition">+5</button>
+                            </div>
+
+                            <button onclick="openTimerModalForPeriod(${idx})" class="no-print bg-amber-400 hover:bg-amber-300 text-slate-950 p-1.5 rounded-lg text-xs font-bold transition">
+                                <i data-lucide="timer" class="w-4 h-4"></i>
+                            </button>
+
+                            <button onclick="deletePeriod(${idx})" class="no-print text-slate-300 hover:text-rose-500 p-1.5 rounded-lg hover:bg-rose-50 transition">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Quick Select Tag:</label>
+                            <button onclick="addDrillOptionPrompt(${idx})" class="no-print text-emerald-600 text-[11px] font-bold flex items-center gap-1 hover:text-emerald-500 transition">+ Add Tag</button>
+                        </div>
+
+                        <div class="flex flex-wrap gap-1.5">
+                            ${optionsList.map(drill => {
+                                const isSelected = (period.selectedDrills || []).includes(drill);
+                                return `
+                                    <button onclick="selectDrill(${idx}, '${escapeHtml(drill)}')" class="text-xs px-2.5 py-1 rounded-lg font-bold border transition ${
+                                        isSelected ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                                    }">
+                                        ${isSelected ? '✓ ' : ''}${escapeHtml(drill)}
+                                    </button>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 mt-1">
+                        <input type="text" value="${escapeHtml(period.customNotes || '')}" onchange="updatePeriodNotes(${idx}, this.value)" placeholder="Coaching script / play details..." class="w-full text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-800 focus:outline-none focus:border-emerald-500 transition">
+                    </div>
+                `;
+
+                container.appendChild(card);
+            });
+
+            lucide.createIcons();
+        };
+
+        window.selectDrill = function(idx, drill) {
+            window.periods[idx].selectedDrills = [drill];
+            renderSchedule();
+            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
+        };
+
+        window.addDrillOptionPrompt = function(idx) {
+            const val = prompt("Enter new tag/drill name:");
+            if (val && val.trim()) {
+                if (!window.periods[idx].options) window.periods[idx].options = [];
+                window.periods[idx].options.push(val.trim());
+                window.periods[idx].selectedDrills = [val.trim()];
+                renderSchedule();
+                if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
+            }
+        };
+
+        window.updatePeriodTitle = function(idx, val) {
+            window.periods[idx].title = val;
+            renderSchedule();
+            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
+        };
+
+        window.updatePeriodDuration = function(idx, val) {
+            window.periods[idx].duration = Math.max(0, parseInt(val) || 0);
+            renderSchedule();
+            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
+        };
+
+        window.adjustTime = function(idx, delta) {
+            window.periods[idx].duration = Math.max(0, (parseInt(window.periods[idx].duration) || 0) + delta);
+            renderSchedule();
+            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
+        };
+
+        window.updatePeriodNotes = function(idx, val) {
+            window.periods[idx].customNotes = val;
+            renderSchedule();
+            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
+        };
+
+        window.deletePeriod = function(idx) {
+            window.periods.splice(idx, 1);
+            renderSchedule();
+            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
+        };
+
+        window.addPeriod = function() {
+            window.periods.push({
+                id: Date.now(),
+                title: "Custom Block",
+                duration: 10,
+                isFixed: false,
+                options: ["Option A", "Option B"],
+                selectedDrills: ["Option A"],
+                customNotes: "",
+                attachedFiles: []
+            });
+            renderSchedule();
+            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
+        };
+
+        // --- Sideline Timer Logic ---
+        window.openTimerModal = function() {
+            openTimerModalForPeriod(window.activePeriodIndex || 0);
+        };
+
+        window.openTimerModalForPeriod = function(pIdx) {
+            if (window.periods.length === 0) return;
+            window.activePeriodIndex = pIdx;
+            
+            const current = window.periods[pIdx];
+            window.timerSeconds = (parseInt(current.duration) || 0) * 60;
+            
+            setupTimerPeriodDisplay();
+            toggleMasterRole(window.isMasterOperator);
+            
+            document.getElementById('timerModal').classList.remove('hidden');
+            document.getElementById('timerModal').classList.add('flex');
+            lucide.createIcons();
+        };
+
+        window.closeTimerModal = function() {
+            document.getElementById('timerModal').classList.add('hidden');
+            document.getElementById('timerModal').classList.remove('flex');
+        };
+
+        window.setupTimerPeriodDisplay = function() {
+            const current = window.periods[window.activePeriodIndex];
+            if (!current) return;
+
+            document.getElementById('timerPeriodBadge').textContent = `PERIOD ${window.activePeriodIndex + 1}`;
+            document.getElementById('timerPeriodTitle').textContent = current.title.toUpperCase();
+
+            const drillsText = (current.selectedDrills || []).join(', ') + (current.customNotes ? ` (${current.customNotes})` : '');
+            document.getElementById('timerPeriodDrills').textContent = drillsText || "General Drills";
+
+            updateTimerDisplay();
+
+            const next = window.periods[window.activePeriodIndex + 1];
+            if (next) {
+                document.getElementById('nextPeriodTitle').textContent = `${next.title} — ${(next.selectedDrills || []).join(', ')}`;
+                document.getElementById('nextPeriodTime').textContent = `${next.duration} Mins`;
+            } else {
+                document.getElementById('nextPeriodTitle').textContent = "End of Practice / Final Huddle";
+                document.getElementById('nextPeriodTime').textContent = "0 Mins";
+            }
+        };
+
+        window.updateTimerDisplay = function() {
+            const mins = Math.floor(window.timerSeconds / 60);
+            const secs = window.timerSeconds % 60;
+            document.getElementById('bigTimerDisplay').textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        };
+
+        window.updateTimerButtonUI = function(isRunning) {
+            const btn = document.getElementById('playPauseBtn');
+            if (!btn) return;
+            btn.innerHTML = isRunning 
+                ? `<i data-lucide="pause" class="w-6 h-6 fill-current"></i> PAUSE`
+                : `<i data-lucide="play" class="w-6 h-6 fill-current"></i> START`;
+            lucide.createIcons();
+        };
+
+        window.toggleSyncedTimer = function() {
+            if (!window.isMasterOperator) return;
+            const isCurrentlyRunning = window.syncedTimer.isRunning;
+            const now = Date.now();
+
+            if (!isCurrentlyRunning) {
+                const endTimeMs = now + (window.timerSeconds * 1000);
+                const updatedTimer = {
+                    ...window.syncedTimer,
+                    isRunning: true,
+                    endTimeMs: endTimeMs,
+                    remainingSeconds: window.timerSeconds,
+                    isInjuryTimeout: false,
+                    isWaterOverride: false
+                };
+                window.syncedTimer = updatedTimer;
+                if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
+            } else {
+                const updatedTimer = {
+                    ...window.syncedTimer,
+                    isRunning: false,
+                    endTimeMs: 0,
+                    remainingSeconds: window.timerSeconds,
+                    isInjuryTimeout: false,
+                    isWaterOverride: false
+                };
+                window.syncedTimer = updatedTimer;
+                if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
+            }
+        };
+
+        window.resetSyncedTimer = function() {
+            if (!window.isMasterOperator) return;
+            const current = window.periods[window.activePeriodIndex];
+            const secs = (parseInt(current?.duration) || 0) * 60;
+            
+            const updatedTimer = {
+                ...window.syncedTimer,
+                isRunning: false,
+                endTimeMs: 0,
+                remainingSeconds: secs,
+                isInjuryTimeout: false,
+                isWaterOverride: false
+            };
+            window.syncedTimer = updatedTimer;
+            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
+        };
+
+        window.nextSyncedPeriod = function() {
+            if (!window.isMasterOperator) return;
+
+            // If a water break was queued or threshold met, trigger break BEFORE advancing
+            if (window.syncedTimer.waterBreakPending || (window.syncedTimer.continuousFieldSecs >= window.waterBreakIntervalMins * 60)) {
+                triggerTransitionWaterBreak();
+                return;
+            }
+
+            if (window.activePeriodIndex < window.periods.length - 1) {
+                const nextIdx = window.activePeriodIndex + 1;
+                const nextPeriodObj = window.periods[nextIdx];
+                const secs = (parseInt(nextPeriodObj?.duration) || 0) * 60;
+
+                const updatedTimer = {
+                    ...window.syncedTimer,
+                    activePeriodIndex: nextIdx,
+                    isRunning: false,
+                    endTimeMs: 0,
+                    remainingSeconds: secs,
+                    isInjuryTimeout: false,
+                    isWaterOverride: false
+                };
+                window.syncedTimer = updatedTimer;
+                if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
+            } else {
+                showToast("Practice Complete! Great job Coach!", true);
+            }
+        };
+
+        window.prevSyncedPeriod = function() {
+            if (!window.isMasterOperator) return;
+            if (window.activePeriodIndex > 0) {
+                const prevIdx = window.activePeriodIndex - 1;
+                const prevPeriodObj = window.periods[prevIdx];
+                const secs = (parseInt(prevPeriodObj?.duration) || 0) * 60;
+
+                const updatedTimer = {
+                    ...window.syncedTimer,
+                    activePeriodIndex: prevIdx,
+                    isRunning: false,
+                    endTimeMs: 0,
+                    remainingSeconds: secs,
+                    isInjuryTimeout: false,
+                    isWaterOverride: false
+                };
+                window.syncedTimer = updatedTimer;
+                if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
+            }
+        };
+
+        window.startLocalTimerTick = function() {
+            if (window.timerInterval) clearInterval(window.timerInterval);
+
+            window.timerInterval = setInterval(() => {
+                if (window.syncedTimer.isRunning && !window.syncedTimer.isInjuryTimeout && !window.syncedTimer.isWaterOverride) {
+                    const now = Date.now();
+                    const remaining = Math.max(0, Math.round((window.syncedTimer.endTimeMs - now) / 1000));
+                    window.timerSeconds = remaining;
+                    
+                    // Track elapsed active field time
+                    window.syncedTimer.continuousFieldSecs = (window.syncedTimer.continuousFieldSecs || 0) + 1;
+                    
+                    // Flag pending water break if threshold passed during active drill
+                    const safetyLimitSecs = window.waterBreakIntervalMins * 60;
+                    if (window.syncedTimer.continuousFieldSecs >= safetyLimitSecs && !window.syncedTimer.waterBreakPending) {
+                        window.syncedTimer.waterBreakPending = true;
+                        if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(window.syncedTimer);
+                    }
+
+                    updateTimerDisplay();
+
+                    if (remaining <= 0) {
+                        clearInterval(window.timerInterval);
+                        window.timerInterval = null;
+                        playWhistle();
+                        if (window.isMasterOperator) nextSyncedPeriod();
+                    }
+                }
+            }, 1000);
+        };
+
+        window.playWhistle = function() {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                const ctx = new AudioContext();
+
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(2800, ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(3200, ctx.currentTime + 0.1);
+                osc.frequency.linearRampToValueAtTime(2800, ctx.currentTime + 0.2);
+
+                gain.gain.setValueAtTime(0, ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.8, ctx.currentTime + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.6);
+            } catch (e) {
+                console.log("Audio play blocked", e);
+            }
+        };
+
+        window.showToast = function(msg, isSuccess = true) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMsg.textContent = msg;
+            toastIcon.className = isSuccess ? "w-4 h-4 text-emerald-400" : "w-4 h-4 text-rose-400";
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        };
+
+        window.showConfirmModal = function(msg, onConfirm) {
+            if (confirm(msg)) onConfirm();
+        };
+
+        // Fixed Apostrophe Escaping Bug
+        window.escapeHtml = function(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        };
+
+        // Required link between Module listener and Global logic
+        window.handleIncomingSyncedTimer = function(incoming) {
             window.syncedTimer = incoming;
             window.activePeriodIndex = incoming.activePeriodIndex || 0;
             
-            // Toggle pending badge
             const pendingBadge = document.getElementById('pendingWaterBadge');
-            if (pendingBadge) {
-                pendingBadge.classList.toggle('hidden', !incoming.waterBreakPending);
-            }
+            if (pendingBadge) pendingBadge.classList.toggle('hidden', !incoming.waterBreakPending);
 
             if (incoming.isWaterOverride) {
                 document.getElementById('waterBreakOverrideBanner').classList.remove('hidden');
@@ -447,692 +1199,9 @@
                 clearInterval(window.timerInterval);
                 window.timerInterval = null;
             }
-        }
-
-        window.syncActivePracticeToCloud = async function(timerDataToUpdate = null) {
-            if (!currentUser || isRemoteUpdate) return;
-            try {
-                const activeDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'active_practice', 'current');
-                await setDoc(activeDocRef, {
-                    date: document.getElementById('practiceDate').value,
-                    startTime: document.getElementById('startTime').value,
-                    gear: document.getElementById('gearSelect').value,
-                    todayFocus: document.getElementById('todayFocus').value,
-                    yesterdayGood: document.getElementById('yesterdayGood').value,
-                    yesterdayBad: document.getElementById('yesterdayBad').value,
-                    staffNotes: document.getElementById('staffNotes').value,
-                    totalMinutes: calculateTimes().totalMinutes,
-                    periods: window.periods,
-                    syncedTimer: timerDataToUpdate || window.syncedTimer,
-                    lastUpdatedBy: currentUser.uid,
-                    lastUpdatedAt: new Date().toISOString()
-                });
-            } catch (err) {
-                console.error("Cloud sync error:", err);
-            }
         };
-
-        window.saveCurrentPractice = async function() {
-            if (!currentUser) return showToast("Connecting...", false);
-
-            const practiceData = {
-                date: document.getElementById('practiceDate').value,
-                startTime: document.getElementById('startTime').value,
-                gear: document.getElementById('gearSelect').value,
-                todayFocus: document.getElementById('todayFocus').value,
-                yesterdayGood: document.getElementById('yesterdayGood').value,
-                yesterdayBad: document.getElementById('yesterdayBad').value,
-                staffNotes: document.getElementById('staffNotes').value,
-                totalMinutes: calculateTimes().totalMinutes,
-                periods: window.periods,
-                createdAt: new Date().toISOString(),
-                createdBy: currentUser.uid
-            };
-
-            try {
-                const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'practice_history');
-                await addDoc(colRef, practiceData);
-                showToast("Saved to Staff Log!", true);
-            } catch (err) {
-                console.error("Save error:", err);
-            }
-        };
-
-        window.deleteHistoryRecord = async function(docId) {
-            if (!currentUser) return;
-            showConfirmModal("Delete record from history?", async () => {
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'practice_history', docId);
-                await deleteDoc(docRef);
-                showToast("Record Deleted!", true);
-            });
-        };
-    </script>
-
-    <!-- Main Application UI Logic -->
-    <script>
-        const DEFAULT_PRACTICE_BLOCKS = [
-            { id: 1, title: "Warm Up", duration: 10, isFixed: true, options: ["Dynamic Warmup"], selectedDrills: ["Dynamic Warmup"], customNotes: "", attachedFiles: [] },
-            { id: 2, title: "Blood Pumper", duration: 10, isFixed: false, options: ["Take Off", "Pursuit", "Other"], selectedDrills: ["Take Off"], customNotes: "", attachedFiles: [] },
-            { id: 3, title: "Indy / Group", duration: 20, isFixed: false, options: ["O Indy", "D Indy", "Form Rec", "Install"], selectedDrills: ["O Indy"], customNotes: "", attachedFiles: [] },
-            { id: 4, title: "Stations / Team Build", duration: 20, isFixed: false, options: ["Ball Skills", "Blocking", "Tackling", "Team Builder"], selectedDrills: ["Ball Skills"], customNotes: "", attachedFiles: [] },
-            { id: 5, title: "Group / Team", duration: 30, isFixed: false, options: ["7 on 7 with Inside Run", "Team"], selectedDrills: ["7 on 7 with Inside Run"], customNotes: "", attachedFiles: [] },
-            { id: 6, title: "Conditioning", duration: 15, isFixed: false, options: ["10 10s", "Gassers", "Fartlek", "Champions"], selectedDrills: ["10 10s"], customNotes: "", attachedFiles: [] },
-            { id: 7, title: "Team Announcements", duration: 15, isFixed: false, options: ["Game Prep", "Equipment Check", "Next Practice Info", "Parent/Roster Reminders"], selectedDrills: ["Game Prep"], customNotes: "", attachedFiles: [] }
-        ];
-
-        window.periods = JSON.parse(JSON.stringify(DEFAULT_PRACTICE_BLOCKS));
-        window.activePeriodIndex = 0;
-        window.timerSeconds = 600;
-        window.timerInterval = null;
-        window.injuryInterval = null;
-        window.waterInterval = null;
-        window.isMasterOperator = true;
-        window.waterBreakIntervalMins = 30;
-
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('practiceDate').valueAsDate = new Date();
-            document.getElementById('todayFocus').value = "Execution & Fundamentals";
-            document.getElementById('yesterdayGood').value = "Great hustle during 7v7";
-            document.getElementById('yesterdayBad').value = "Tackling angles & Huddle tempo";
-            renderSchedule();
-            lucide.createIcons();
-        });
-
-        // Weather API Auto Integration
-        async function fetchLiveWeather() {
-            try {
-                showToast("Fetching local weather...", true);
-                const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=40.80&longitude=-81.70&current=temperature_2m,relative_humidity_2m&temperature_unit=fahrenheit');
-                const data = await res.json();
-                
-                if (data && data.current) {
-                    const temp = Math.round(data.current.temperature_2m);
-                    const humidity = data.current.relative_humidity_2m;
-                    const heatIndex = Math.round(temp + (0.05 * humidity));
-                    
-                    let zoneText = "Normal Conditions (Break between periods ~30m)";
-                    let selectVal = "normal";
-
-                    if (heatIndex >= 88) {
-                        zoneText = "EXTREME HEAT (Break between periods ~10m)";
-                        selectVal = "extreme";
-                    } else if (heatIndex >= 85) {
-                        zoneText = "HIGH HEAT (Break between periods ~15m)";
-                        selectVal = "high";
-                    } else if (heatIndex >= 80) {
-                        zoneText = "ELEVATED HEAT (Break between periods ~20m)";
-                        selectVal = "elevated";
-                    }
-
-                    document.getElementById('weatherReadout').textContent = `${temp}°F (${humidity}% Humidity) • ${zoneText}`;
-                    document.getElementById('heatIndexSelect').value = selectVal;
-                    updateWeatherRules();
-                    showToast(`Weather Rules Set: ${temp}°F`, true);
-                }
-            } catch (err) {
-                showToast("Weather fetch failed, set manually", false);
-            }
-        }
-
-        function updateWeatherRules() {
-            const level = document.getElementById('heatIndexSelect').value;
-            if (level === "extreme") window.waterBreakIntervalMins = 10;
-            else if (level === "high") window.waterBreakIntervalMins = 15;
-            else if (level === "elevated") window.waterBreakIntervalMins = 20;
-            else window.waterBreakIntervalMins = 30;
-        }
-
-        // Trigger Transition Water Break
-        function triggerTransitionWaterBreak() {
-            if (!window.isMasterOperator) return;
-            const breakSecs = 240; // 4 minutes
-            const updatedTimer = {
-                activePeriodIndex: window.activePeriodIndex,
-                isRunning: false,
-                endTimeMs: 0,
-                remainingSeconds: window.timerSeconds,
-                isInjuryTimeout: false,
-                isWaterOverride: true,
-                waterEndMs: Date.now() + (breakSecs * 1000),
-                continuousFieldSecs: 0,
-                waterBreakPending: false
-            };
-            window.syncedTimer = updatedTimer;
-            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
-            playWhistle();
-        }
-
-        function endWaterBreakOverride() {
-            if (!window.isMasterOperator) return;
-
-            const updatedTimer = {
-                activePeriodIndex: window.activePeriodIndex,
-                isRunning: false,
-                endTimeMs: 0,
-                remainingSeconds: window.timerSeconds,
-                isWaterOverride: false,
-                waterEndMs: 0,
-                continuousFieldSecs: 0,
-                waterBreakPending: false
-            };
-            window.syncedTimer = updatedTimer;
-            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
-            playWhistle();
-        }
-
-        function startWaterOverrideTick() {
-            if (window.waterInterval) clearInterval(window.waterInterval);
-
-            window.waterInterval = setInterval(() => {
-                if (window.syncedTimer.isWaterOverride) {
-                    const remaining = Math.max(0, Math.round((window.syncedTimer.waterEndMs - Date.now()) / 1000));
-                    const mins = Math.floor(remaining / 60);
-                    const secs = remaining % 60;
-                    document.getElementById('waterOverrideDisplay').textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-
-                    if (remaining <= 0) {
-                        clearInterval(window.waterInterval);
-                        window.waterInterval = null;
-                        playWhistle();
-                        if (window.isMasterOperator) endWaterBreakOverride();
-                    }
-                }
-            }, 1000);
-        }
-
-        // Injury Delay Mechanics
-        function triggerInjuryTimeout() {
-            if (!window.isMasterOperator) return;
-            const updatedTimer = {
-                activePeriodIndex: window.activePeriodIndex,
-                isRunning: false,
-                endTimeMs: 0,
-                remainingSeconds: window.timerSeconds,
-                isInjuryTimeout: true,
-                injuryStartMs: Date.now(),
-                isWaterOverride: false
-            };
-            window.syncedTimer = updatedTimer;
-            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
-        }
-
-        function resumeFromInjury(shiftSchedule = false) {
-            if (!window.isMasterOperator) return;
-            
-            const elapsedSecs = Math.round((Date.now() - (window.syncedTimer.injuryStartMs || Date.now())) / 1000);
-            const elapsedMins = Math.ceil(elapsedSecs / 60);
-
-            if (shiftSchedule && elapsedMins > 0) {
-                const startInput = document.getElementById('startTime').value || "15:00";
-                const [startHour, startMin] = startInput.split(':').map(Number);
-                let newTime = new Date();
-                newTime.setHours(startHour, startMin + elapsedMins, 0, 0);
-                
-                let hrs = newTime.getHours().toString().padStart(2, '0');
-                let mins = newTime.getMinutes().toString().padStart(2, '0');
-                document.getElementById('startTime').value = `${hrs}:${mins}`;
-                showToast(`Shifted remaining schedule by +${elapsedMins} mins`, true);
-            }
-
-            const updatedTimer = {
-                activePeriodIndex: window.activePeriodIndex,
-                isRunning: false,
-                endTimeMs: 0,
-                remainingSeconds: window.timerSeconds,
-                isInjuryTimeout: false,
-                injuryStartMs: 0
-            };
-            window.syncedTimer = updatedTimer;
-            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
-        }
-
-        function startInjuryTick() {
-            if (window.injuryInterval) clearInterval(window.injuryInterval);
-
-            window.injuryInterval = setInterval(() => {
-                if (window.syncedTimer.isInjuryTimeout) {
-                    const elapsedSecs = Math.max(0, Math.round((Date.now() - window.syncedTimer.injuryStartMs) / 1000));
-                    const mins = Math.floor(elapsedSecs / 60);
-                    const secs = elapsedSecs % 60;
-                    document.getElementById('injuryTimerDisplay').textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-                }
-            }, 1000);
-        }
-
-        function toggleMasterRole(isMaster) {
-            window.isMasterOperator = isMaster;
-            document.getElementById('roleLabel').textContent = isMaster ? "Master Clock Operator" : "Assistant (View Only)";
-            
-            const controlBtns = ['playPauseBtn', 'resetBtn', 'nextBtn', 'prevBtn', 'injuryBtn'];
-            controlBtns.forEach(id => {
-                const el = document.getElementById(id);
-                if (el) {
-                    el.disabled = !isMaster;
-                    el.classList.toggle('opacity-40', !isMaster);
-                    el.classList.toggle('cursor-not-allowed', !isMaster);
-                }
-            });
-        }
-
-        function calculateTimes() {
-            const startInput = document.getElementById('startTime').value || "15:00";
-            const [startHour, startMin] = startInput.split(':').map(Number);
-            let currentTime = new Date();
-            currentTime.setHours(startHour, startMin, 0, 0);
-
-            let totalMinutes = 0;
-
-            const timeMapped = window.periods.map(p => {
-                const startTimeStr = formatTime(currentTime);
-                const dur = parseInt(p.duration) || 0;
-                totalMinutes += dur;
-
-                currentTime.setMinutes(currentTime.getMinutes() + dur);
-                const endTimeStr = formatTime(currentTime);
-
-                return { ...p, startTimeStr, endTimeStr };
-            });
-
-            document.getElementById('totalTimeBadge').textContent = `Total: ${totalMinutes} mins`;
-            return { timeMapped, totalMinutes };
-        }
-
-        function formatTime(dateObj) {
-            let hours = dateObj.getHours();
-            let minutes = dateObj.getMinutes();
-            const ampm = hours >= 12 ? 'PM' : 'AM';
-            hours = hours % 12 || 12;
-            minutes = minutes < 10 ? '0' + minutes : minutes;
-            return `${hours}:${minutes} ${ampm}`;
-        }
-
-        function renderSchedule() {
-            const { timeMapped } = calculateTimes();
-            const container = document.getElementById('periodsContainer');
-            container.innerHTML = '';
-
-            const editablePeriods = timeMapped.slice(1);
-
-            editablePeriods.forEach((period, actualIdx) => {
-                const idx = actualIdx + 1;
-                const optionsList = period.options || [];
-
-                const card = document.createElement('div');
-                card.className = "rounded-xl border p-3 shadow-2xs transition print-card space-y-3 bg-white border-slate-200 hover:border-slate-300";
-
-                card.innerHTML = `
-                    <div class="flex flex-wrap justify-between items-center gap-2 pb-2 border-b border-slate-100">
-                        <div class="flex items-center gap-2">
-                            <span class="bg-slate-900 text-white text-[11px] font-black px-2 py-0.5 rounded">
-                                #${idx}
-                            </span>
-                            <input type="text" value="${escapeHtml(period.title)}" onchange="updatePeriodTitle(${idx}, this.value)" class="font-extrabold text-slate-800 text-sm bg-transparent focus:bg-slate-50 focus:outline-none rounded px-1">
-                        </div>
-
-                        <div class="flex items-center gap-2">
-                            <span class="text-xs font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
-                                ${period.startTimeStr} - ${period.endTimeStr}
-                            </span>
-
-                            <div class="flex items-center gap-1 bg-slate-50 rounded-lg p-0.5 border border-slate-200">
-                                <button onclick="adjustTime(${idx}, -5)" class="no-print hover:bg-white text-slate-700 px-2 py-0.5 rounded font-black text-xs transition">-5</button>
-                                <input type="number" value="${period.duration}" min="0" onchange="updatePeriodDuration(${idx}, this.value)" class="w-10 text-center text-xs font-black bg-white rounded border border-slate-200 py-0.5 focus:outline-none">
-                                <span class="text-xs text-slate-400 font-bold pr-1">m</span>
-                                <button onclick="adjustTime(${idx}, 5)" class="no-print hover:bg-white text-slate-700 px-2 py-0.5 rounded font-black text-xs transition">+5</button>
-                            </div>
-
-                            <button onclick="openTimerModalForPeriod(${idx})" class="no-print bg-amber-400 hover:bg-amber-300 text-slate-950 p-1 rounded-lg text-xs font-bold transition">
-                                <i data-lucide="timer" class="w-4 h-4"></i>
-                            </button>
-
-                            <button onclick="deletePeriod(${idx})" class="no-print text-slate-300 hover:text-rose-500 p-1 rounded-lg hover:bg-rose-50 transition">
-                                <i data-lucide="trash-2" class="w-4 h-4"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div>
-                        <div class="flex justify-between items-center mb-1">
-                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Quick Select Tag:</label>
-                            <button onclick="addDrillOptionPrompt(${idx})" class="no-print text-emerald-600 text-[11px] font-bold flex items-center gap-1">+ Add Tag</button>
-                        </div>
-
-                        <div class="flex flex-wrap gap-1.5">
-                            ${optionsList.map(drill => {
-                                const isSelected = (period.selectedDrills || []).includes(drill);
-                                return `
-                                    <button onclick="selectDrill(${idx}, '${escapeHtml(drill)}')" class="text-xs px-2.5 py-1 rounded-lg font-bold border transition ${
-                                        isSelected ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                                    }">
-                                        ${isSelected ? '✓ ' : ''}${escapeHtml(drill)}
-                                    </button>
-                                `;
-                            }).join('')}
-                        </div>
-                    </div>
-
-                    <div class="flex items-center gap-2">
-                        <input type="text" value="${escapeHtml(period.customNotes || '')}" onchange="updatePeriodNotes(${idx}, this.value)" placeholder="Coaching script / play details..." class="w-full text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-800 focus:outline-none focus:border-emerald-500">
-                    </div>
-                `;
-
-                container.appendChild(card);
-            });
-
-            lucide.createIcons();
-        }
-
-        function selectDrill(idx, drill) {
-            window.periods[idx].selectedDrills = [drill];
-            renderSchedule();
-            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
-        }
-
-        function addDrillOptionPrompt(idx) {
-            const val = prompt("Enter new tag/drill name:");
-            if (val && val.trim()) {
-                if (!window.periods[idx].options) window.periods[idx].options = [];
-                window.periods[idx].options.push(val.trim());
-                window.periods[idx].selectedDrills = [val.trim()];
-                renderSchedule();
-                if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
-            }
-        }
-
-        function updatePeriodTitle(idx, val) {
-            window.periods[idx].title = val;
-            renderSchedule();
-            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
-        }
-
-        function updatePeriodDuration(idx, val) {
-            window.periods[idx].duration = Math.max(0, parseInt(val) || 0);
-            renderSchedule();
-            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
-        }
-
-        function adjustTime(idx, delta) {
-            window.periods[idx].duration = Math.max(0, (parseInt(window.periods[idx].duration) || 0) + delta);
-            renderSchedule();
-            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
-        }
-
-        function updatePeriodNotes(idx, val) {
-            window.periods[idx].customNotes = val;
-            renderSchedule();
-            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
-        }
-
-        function deletePeriod(idx) {
-            window.periods.splice(idx, 1);
-            renderSchedule();
-            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
-        }
-
-        function addPeriod() {
-            window.periods.push({
-                id: Date.now(),
-                title: "Custom Block",
-                duration: 10,
-                isFixed: false,
-                options: ["Option A", "Option B"],
-                selectedDrills: ["Option A"],
-                customNotes: "",
-                attachedFiles: []
-            });
-            renderSchedule();
-            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
-        }
-
-        // --- Sideline Timer Logic ---
-        function openTimerModal() {
-            openTimerModalForPeriod(window.activePeriodIndex || 0);
-        }
-
-        function openTimerModalForPeriod(pIdx) {
-            if (window.periods.length === 0) return;
-            window.activePeriodIndex = pIdx;
-            
-            const current = window.periods[pIdx];
-            window.timerSeconds = (parseInt(current.duration) || 0) * 60;
-            
-            setupTimerPeriodDisplay();
-            toggleMasterRole(window.isMasterOperator);
-            
-            document.getElementById('timerModal').classList.remove('hidden');
-            document.getElementById('timerModal').classList.add('flex');
-            lucide.createIcons();
-        }
-
-        function closeTimerModal() {
-            document.getElementById('timerModal').classList.add('hidden');
-            document.getElementById('timerModal').classList.remove('flex');
-        }
-
-        function setupTimerPeriodDisplay() {
-            const current = window.periods[window.activePeriodIndex];
-            if (!current) return;
-
-            document.getElementById('timerPeriodBadge').textContent = `PERIOD ${window.activePeriodIndex + 1}`;
-            document.getElementById('timerPeriodTitle').textContent = current.title.toUpperCase();
-
-            const drillsText = (current.selectedDrills || []).join(', ') + (current.customNotes ? ` (${current.customNotes})` : '');
-            document.getElementById('timerPeriodDrills').textContent = drillsText || "General Drills";
-
-            updateTimerDisplay();
-
-            const next = window.periods[window.activePeriodIndex + 1];
-            if (next) {
-                document.getElementById('nextPeriodTitle').textContent = `${next.title} — ${(next.selectedDrills || []).join(', ')}`;
-                document.getElementById('nextPeriodTime').textContent = `${next.duration} Mins`;
-            } else {
-                document.getElementById('nextPeriodTitle').textContent = "End of Practice / Final Huddle";
-                document.getElementById('nextPeriodTime').textContent = "0 Mins";
-            }
-        }
-
-        function updateTimerDisplay() {
-            const mins = Math.floor(window.timerSeconds / 60);
-            const secs = window.timerSeconds % 60;
-            document.getElementById('bigTimerDisplay').textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        }
-
-        function updateTimerButtonUI(isRunning) {
-            const btn = document.getElementById('playPauseBtn');
-            if (!btn) return;
-            btn.innerHTML = isRunning 
-                ? `<i data-lucide="pause" class="w-6 h-6 fill-current"></i> PAUSE`
-                : `<i data-lucide="play" class="w-6 h-6 fill-current"></i> START`;
-            lucide.createIcons();
-        }
-
-        function toggleSyncedTimer() {
-            if (!window.isMasterOperator) return;
-            const isCurrentlyRunning = window.syncedTimer.isRunning;
-            const now = Date.now();
-
-            if (!isCurrentlyRunning) {
-                const endTimeMs = now + (window.timerSeconds * 1000);
-                const updatedTimer = {
-                    ...window.syncedTimer,
-                    isRunning: true,
-                    endTimeMs: endTimeMs,
-                    remainingSeconds: window.timerSeconds,
-                    isInjuryTimeout: false,
-                    isWaterOverride: false
-                };
-                window.syncedTimer = updatedTimer;
-                if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
-            } else {
-                const updatedTimer = {
-                    ...window.syncedTimer,
-                    isRunning: false,
-                    endTimeMs: 0,
-                    remainingSeconds: window.timerSeconds,
-                    isInjuryTimeout: false,
-                    isWaterOverride: false
-                };
-                window.syncedTimer = updatedTimer;
-                if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
-            }
-        }
-
-        function resetSyncedTimer() {
-            if (!window.isMasterOperator) return;
-            const current = window.periods[window.activePeriodIndex];
-            const secs = (parseInt(current?.duration) || 0) * 60;
-            
-            const updatedTimer = {
-                ...window.syncedTimer,
-                isRunning: false,
-                endTimeMs: 0,
-                remainingSeconds: secs,
-                isInjuryTimeout: false,
-                isWaterOverride: false
-            };
-            window.syncedTimer = updatedTimer;
-            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
-        }
-
-        function nextSyncedPeriod() {
-            if (!window.isMasterOperator) return;
-
-            // If a water break was queued or threshold met, trigger break BEFORE advancing
-            if (window.syncedTimer.waterBreakPending || (window.syncedTimer.continuousFieldSecs >= window.waterBreakIntervalMins * 60)) {
-                triggerTransitionWaterBreak();
-                return;
-            }
-
-            if (window.activePeriodIndex < window.periods.length - 1) {
-                const nextIdx = window.activePeriodIndex + 1;
-                const nextPeriodObj = window.periods[nextIdx];
-                const secs = (parseInt(nextPeriodObj?.duration) || 0) * 60;
-
-                const updatedTimer = {
-                    ...window.syncedTimer,
-                    activePeriodIndex: nextIdx,
-                    isRunning: false,
-                    endTimeMs: 0,
-                    remainingSeconds: secs,
-                    isInjuryTimeout: false,
-                    isWaterOverride: false
-                };
-                window.syncedTimer = updatedTimer;
-                if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
-            } else {
-                showToast("Practice Complete! Great job Coach!", true);
-            }
-        }
-
-        function prevSyncedPeriod() {
-            if (!window.isMasterOperator) return;
-            if (window.activePeriodIndex > 0) {
-                const prevIdx = window.activePeriodIndex - 1;
-                const prevPeriodObj = window.periods[prevIdx];
-                const secs = (parseInt(prevPeriodObj?.duration) || 0) * 60;
-
-                const updatedTimer = {
-                    ...window.syncedTimer,
-                    activePeriodIndex: prevIdx,
-                    isRunning: false,
-                    endTimeMs: 0,
-                    remainingSeconds: secs,
-                    isInjuryTimeout: false,
-                    isWaterOverride: false
-                };
-                window.syncedTimer = updatedTimer;
-                if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
-            }
-        }
-
-        function startLocalTimerTick() {
-            if (window.timerInterval) clearInterval(window.timerInterval);
-
-            window.timerInterval = setInterval(() => {
-                if (window.syncedTimer.isRunning && !window.syncedTimer.isInjuryTimeout && !window.syncedTimer.isWaterOverride) {
-                    const now = Date.now();
-                    const remaining = Math.max(0, Math.round((window.syncedTimer.endTimeMs - now) / 1000));
-                    window.timerSeconds = remaining;
-                    
-                    // Track elapsed active field time
-                    window.syncedTimer.continuousFieldSecs = (window.syncedTimer.continuousFieldSecs || 0) + 1;
-                    
-                    // Flag pending water break if threshold passed during active drill
-                    const safetyLimitSecs = window.waterBreakIntervalMins * 60;
-                    if (window.syncedTimer.continuousFieldSecs >= safetyLimitSecs && !window.syncedTimer.waterBreakPending) {
-                        window.syncedTimer.waterBreakPending = true;
-                        if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(window.syncedTimer);
-                    }
-
-                    updateTimerDisplay();
-
-                    if (remaining <= 0) {
-                        clearInterval(window.timerInterval);
-                        window.timerInterval = null;
-                        playWhistle();
-                        if (window.isMasterOperator) nextSyncedPeriod();
-                    }
-                }
-            }, 1000);
-        }
-
-        function playWhistle() {
-            try {
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                if (!AudioContext) return;
-                const ctx = new AudioContext();
-
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(2800, ctx.currentTime);
-                osc.frequency.linearRampToValueAtTime(3200, ctx.currentTime + 0.1);
-                osc.frequency.linearRampToValueAtTime(2800, ctx.currentTime + 0.2);
-
-                gain.gain.setValueAtTime(0, ctx.currentTime);
-                gain.gain.linearRampToValueAtTime(0.8, ctx.currentTime + 0.05);
-                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
-
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-
-                osc.start(ctx.currentTime);
-                osc.stop(ctx.currentTime + 0.6);
-            } catch (e) {
-                console.log("Audio play blocked", e);
-            }
-        }
-
-        function showToast(msg, isSuccess = true) {
-            const toast = document.getElementById('toast');
-            const toastMsg = document.getElementById('toastMsg');
-            const toastIcon = document.getElementById('toastIcon');
-
-            toastMsg.textContent = msg;
-            toastIcon.className = isSuccess ? "w-4 h-4 text-emerald-400" : "w-4 h-4 text-rose-400";
-            
-            toast.classList.remove('translate-y-20', 'opacity-0');
-            toast.classList.add('translate-y-0', 'opacity-100');
-
-            setTimeout(() => {
-                toast.classList.remove('translate-y-0', 'opacity-100');
-                toast.classList.add('translate-y-20', 'opacity-0');
-            }, 3000);
-        }
-
-        function showConfirmModal(msg, onConfirm) {
-            if (confirm(msg)) onConfirm();
-        }
-
-        function escapeHtml(str) {
-            return String(str)
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;');
-        }
     </script>
 </body>
 </html>
+
 
