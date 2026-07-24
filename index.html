@@ -84,7 +84,7 @@
             <textarea id="staffNotes" rows="2" onchange="syncActivePracticeToCloud()" placeholder="Quick messages for coaches during the school day..." class="w-full bg-white/80 border border-amber-200 rounded-lg p-2 text-xs font-medium text-amber-950 focus:ring-2 focus:ring-amber-400 focus:outline-none"></textarea>
         </div>
 
-        <!-- Practice Overview Bar & Live Weather Integration -->
+        <!-- Practice Overview Bar & Weather Engine -->
         <div class="bg-white rounded-xl shadow-2xs border border-slate-200 p-3.5 print-card space-y-3">
             <div class="flex flex-wrap justify-between items-center gap-3">
                 <div class="flex items-center gap-3 flex-wrap flex-1">
@@ -112,34 +112,30 @@
                 </span>
             </div>
 
-            <!-- Live Weather & Water Break Protocol Injector -->
+            <!-- Auto Weather & Transition Break Engine -->
             <div class="bg-cyan-50/70 border border-cyan-200 rounded-lg p-2.5 flex flex-wrap justify-between items-center gap-2 no-print">
                 <div class="flex items-center gap-2 flex-wrap">
                     <div class="flex items-center gap-1.5 text-xs font-black text-cyan-950 uppercase">
                         <i data-lucide="sun-medium" class="w-4 h-4 text-amber-500"></i>
-                        <span>OHSAA Heat Safety:</span>
+                        <span>OHSAA Transition Break Safety Engine:</span>
                     </div>
 
                     <button onclick="fetchLiveWeather()" class="bg-cyan-700 hover:bg-cyan-800 text-white text-xs font-bold px-2.5 py-1 rounded-md transition flex items-center gap-1">
-                        <i data-lucide="cloud-sun" class="w-3.5 h-3.5"></i> Fetch Local Weather
+                        <i data-lucide="cloud-sun" class="w-3.5 h-3.5"></i> Auto-Detect Weather
                     </button>
 
                     <span id="weatherReadout" class="text-xs font-bold text-cyan-900 bg-white/80 border border-cyan-200 px-2 py-0.5 rounded">
-                        75°F • Normal Conditions
+                        75°F • Normal Conditions (Break between periods ~30m)
                     </span>
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <select id="heatIndexSelect" class="bg-white border border-cyan-300 text-cyan-950 text-xs font-bold rounded-md px-2 py-1 focus:outline-none">
-                        <option value="normal">Green Zone (< 79.7°F) • Standard Breaks</option>
-                        <option value="elevated">Caution (79.8°-84.6°F) • 3x 4m Breaks/hr</option>
-                        <option value="high">Warning (84.7°-87.6°F) • 4x 4m Breaks/hr</option>
-                        <option value="extreme">Extreme (87.8°-89.7°F) • 4x 5m Breaks/hr</option>
+                    <select id="heatIndexSelect" onchange="updateWeatherRules()" class="bg-white border border-cyan-300 text-cyan-950 text-xs font-bold rounded-md px-2 py-1 focus:outline-none">
+                        <option value="normal">Normal (< 79.7°F) • Water break between periods (~30m)</option>
+                        <option value="elevated">Caution (79.8°-84.6°F) • Water break between periods (~20m)</option>
+                        <option value="high">Warning (84.7°-87.6°F) • Water break between periods (~15m)</option>
+                        <option value="extreme">Extreme (87.8°-89.7°F) • Water break between periods (~10m)</option>
                     </select>
-
-                    <button onclick="applyHeatProtocol()" class="bg-cyan-800 hover:bg-cyan-900 text-white text-xs font-bold px-3 py-1 rounded-lg transition flex items-center gap-1">
-                        <i data-lucide="droplets" class="w-3.5 h-3.5"></i> Inject Water Breaks
-                    </button>
                 </div>
             </div>
 
@@ -215,7 +211,7 @@
         </div>
     </div>
 
-    <!-- Live Synced Sideline Timer Modal with Injury Timeout Engine -->
+    <!-- Live Synced Sideline Timer Modal with Transition Water Break Overlay -->
     <div id="timerModal" class="fixed inset-0 bg-slate-950 z-50 hidden flex-col justify-between p-6 text-white no-print">
         <div class="flex justify-between items-center max-w-4xl mx-auto w-full border-b border-slate-800 pb-3">
             <div class="flex items-center gap-3">
@@ -228,18 +224,35 @@
                     <span class="text-[11px] font-bold text-amber-300" id="roleLabel">Master Clock Operator</span>
                 </label>
             </div>
+
+            <div id="pendingWaterBadge" class="hidden bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 px-3 py-1 rounded-full text-xs font-extrabold flex items-center gap-1.5 animate-pulse">
+                <i data-lucide="droplets" class="w-3.5 h-3.5 text-cyan-400"></i> Water Break Scheduled After Current Drill
+            </div>
+
             <button onclick="closeTimerModal()" class="p-2 bg-slate-900 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition">
                 <i data-lucide="x" class="w-5 h-5"></i>
             </button>
         </div>
 
-        <div class="max-w-3xl mx-auto w-full text-center space-y-5 my-auto">
+        <div class="max-w-3xl mx-auto w-full text-center space-y-4 my-auto">
             <div>
-                <span id="timerPeriodBadge" class="inline-block bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-4 py-1 rounded-full text-xs font-black tracking-widest uppercase mb-2">
+                <span id="timerPeriodBadge" class="inline-block bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-4 py-1 rounded-full text-xs font-black tracking-widest uppercase mb-1">
                     PERIOD 1
                 </span>
                 <h1 id="timerPeriodTitle" class="text-3xl md:text-5xl font-black text-white tracking-tight">WARM UP</h1>
-                <p id="timerPeriodDrills" class="text-amber-400 text-lg font-extrabold mt-2 max-w-xl mx-auto">Dynamic Warmup</p>
+                <p id="timerPeriodDrills" class="text-amber-400 text-lg font-extrabold mt-1 max-w-xl mx-auto">Dynamic Warmup</p>
+            </div>
+
+            <!-- Mandatory Weather Hydration Overlay Banner (Triggers Between Drills) -->
+            <div id="waterBreakOverrideBanner" class="hidden bg-cyan-600 border border-cyan-300 text-white rounded-2xl p-4 shadow-xl space-y-2 animate-pulse">
+                <div class="flex justify-center items-center gap-2 font-black text-lg uppercase tracking-wide">
+                    <i data-lucide="droplets" class="w-6 h-6 text-cyan-200"></i> MANDATORY HYDRATION & SHADE BREAK
+                </div>
+                <div class="font-mono text-4xl font-black text-cyan-100" id="waterOverrideDisplay">04:00</div>
+                <p class="text-xs font-medium text-cyan-100">Transition Break Active • Helmets Off & Hydrate before next block.</p>
+                <div class="flex justify-center gap-2 pt-1">
+                    <button onclick="endWaterBreakOverride()" class="bg-white text-cyan-950 text-xs font-black px-4 py-1.5 rounded-lg shadow-md hover:bg-cyan-50">Start Next Drill Now</button>
+                </div>
             </div>
 
             <!-- Injury Timeout Active Banner -->
@@ -255,12 +268,12 @@
                 </div>
             </div>
 
-            <div id="normalTimerCard" class="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl backdrop-blur-md">
+            <div id="normalTimerCard" class="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 shadow-2xl backdrop-blur-md">
                 <div id="bigTimerDisplay" class="font-mono text-7xl md:text-9xl font-black text-amber-400 tracking-wider leading-none">
                     10:00
                 </div>
 
-                <div class="flex justify-center items-center gap-3 mt-6 flex-wrap">
+                <div class="flex justify-center items-center gap-2.5 mt-5 flex-wrap">
                     <button id="prevBtn" onclick="prevSyncedPeriod()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-3 rounded-xl font-bold transition" title="Previous Period">
                         <i data-lucide="skip-back" class="w-5 h-5"></i>
                     </button>
@@ -269,16 +282,16 @@
                         <i data-lucide="play" class="w-6 h-6 fill-current"></i> START
                     </button>
 
-                    <button id="injuryBtn" onclick="triggerInjuryTimeout()" class="bg-rose-600 hover:bg-rose-500 text-white px-4 py-3 rounded-xl font-black text-xs flex items-center gap-1.5 shadow-lg transition transform active:scale-95">
-                        <i data-lucide="activity" class="w-4 h-4"></i> INJURY TIMEOUT
+                    <button id="injuryBtn" onclick="triggerInjuryTimeout()" class="bg-rose-600 hover:bg-rose-500 text-white px-3.5 py-3 rounded-xl font-black text-xs flex items-center gap-1 shadow-lg transition transform active:scale-95">
+                        <i data-lucide="activity" class="w-4 h-4"></i> INJURY
                     </button>
 
                     <button id="resetBtn" onclick="resetSyncedTimer()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-3 rounded-xl font-bold transition" title="Reset Current Period">
                         <i data-lucide="rotate-ccw" class="w-5 h-5"></i>
                     </button>
 
-                    <button onclick="playWhistle()" class="bg-amber-400 hover:bg-amber-300 text-slate-950 px-5 py-3 rounded-xl font-black text-xs flex items-center gap-2 shadow-lg transition transform active:scale-95">
-                        <i data-lucide="volume-2" class="w-5 h-5"></i> WHISTLE
+                    <button onclick="playWhistle()" class="bg-amber-400 hover:bg-amber-300 text-slate-950 px-4 py-3 rounded-xl font-black text-xs flex items-center gap-1.5 shadow-lg transition transform active:scale-95">
+                        <i data-lucide="volume-2" class="w-4 h-4"></i> WHISTLE
                     </button>
 
                     <button id="nextBtn" onclick="nextSyncedPeriod()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-3 rounded-xl font-bold transition" title="Next Period">
@@ -297,7 +310,7 @@
         </div>
 
         <div class="text-center text-[10px] text-slate-600 max-w-4xl mx-auto w-full border-t border-slate-900 pt-2">
-            Middle School Gridiron Assistant • Master Clock & Injury Delay Tracking
+            Middle School Gridiron Assistant • Transition Hydration Rules Active
         </div>
     </div>
 
@@ -326,7 +339,11 @@
             endTimeMs: 0,
             remainingSeconds: 600,
             isInjuryTimeout: false,
-            injuryStartMs: 0
+            injuryStartMs: 0,
+            isWaterOverride: false,
+            waterEndMs: 0,
+            continuousFieldSecs: 0,
+            waterBreakPending: false
         };
 
         const initAuth = async () => {
@@ -389,13 +406,27 @@
             window.syncedTimer = incoming;
             window.activePeriodIndex = incoming.activePeriodIndex || 0;
             
-            if (incoming.isInjuryTimeout) {
+            // Toggle pending badge
+            const pendingBadge = document.getElementById('pendingWaterBadge');
+            if (pendingBadge) {
+                pendingBadge.classList.toggle('hidden', !incoming.waterBreakPending);
+            }
+
+            if (incoming.isWaterOverride) {
+                document.getElementById('waterBreakOverrideBanner').classList.remove('hidden');
+                document.getElementById('injuryBanner').classList.add('hidden');
+                document.getElementById('normalTimerCard').classList.add('opacity-40');
+                startWaterOverrideTick();
+            } else if (incoming.isInjuryTimeout) {
                 document.getElementById('injuryBanner').classList.remove('hidden');
+                document.getElementById('waterBreakOverrideBanner').classList.add('hidden');
                 document.getElementById('normalTimerCard').classList.add('opacity-40');
                 startInjuryTick();
             } else {
+                document.getElementById('waterBreakOverrideBanner').classList.add('hidden');
                 document.getElementById('injuryBanner').classList.add('hidden');
                 document.getElementById('normalTimerCard').classList.remove('opacity-40');
+                if (window.waterInterval) clearInterval(window.waterInterval);
                 if (window.injuryInterval) clearInterval(window.injuryInterval);
 
                 if (incoming.isRunning) {
@@ -410,7 +441,7 @@
             setupTimerPeriodDisplay();
             updateTimerButtonUI(incoming.isRunning);
 
-            if (incoming.isRunning && !window.timerInterval && !incoming.isInjuryTimeout) {
+            if (incoming.isRunning && !window.timerInterval && !incoming.isInjuryTimeout && !incoming.isWaterOverride) {
                 startLocalTimerTick();
             } else if (!incoming.isRunning && window.timerInterval) {
                 clearInterval(window.timerInterval);
@@ -494,7 +525,9 @@
         window.timerSeconds = 600;
         window.timerInterval = null;
         window.injuryInterval = null;
+        window.waterInterval = null;
         window.isMasterOperator = true;
+        window.waterBreakIntervalMins = 30;
 
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('practiceDate').valueAsDate = new Date();
@@ -505,7 +538,7 @@
             lucide.createIcons();
         });
 
-        // Weather API Integration
+        // Weather API Auto Integration
         async function fetchLiveWeather() {
             try {
                 showToast("Fetching local weather...", true);
@@ -515,83 +548,96 @@
                 if (data && data.current) {
                     const temp = Math.round(data.current.temperature_2m);
                     const humidity = data.current.relative_humidity_2m;
-                    
-                    // Simple Heat Index approximation
                     const heatIndex = Math.round(temp + (0.05 * humidity));
                     
-                    let zoneText = "Normal Conditions";
+                    let zoneText = "Normal Conditions (Break between periods ~30m)";
                     let selectVal = "normal";
 
                     if (heatIndex >= 88) {
-                        zoneText = "EXTREME HEAT WARNING";
+                        zoneText = "EXTREME HEAT (Break between periods ~10m)";
                         selectVal = "extreme";
                     } else if (heatIndex >= 85) {
-                        zoneText = "HIGH HEAT WARNING";
+                        zoneText = "HIGH HEAT (Break between periods ~15m)";
                         selectVal = "high";
                     } else if (heatIndex >= 80) {
-                        zoneText = "ELEVATED HEAT CAUTION";
+                        zoneText = "ELEVATED HEAT (Break between periods ~20m)";
                         selectVal = "elevated";
                     }
 
                     document.getElementById('weatherReadout').textContent = `${temp}°F (${humidity}% Humidity) • ${zoneText}`;
                     document.getElementById('heatIndexSelect').value = selectVal;
-                    showToast(`Weather Updated: ${temp}°F`, true);
+                    updateWeatherRules();
+                    showToast(`Weather Rules Set: ${temp}°F`, true);
                 }
             } catch (err) {
                 showToast("Weather fetch failed, set manually", false);
             }
         }
 
-        function applyHeatProtocol() {
-            const heatLevel = document.getElementById('heatIndexSelect').value;
-            let cleanPeriods = window.periods.filter(p => p.title !== "WATER / SHADE BREAK");
+        function updateWeatherRules() {
+            const level = document.getElementById('heatIndexSelect').value;
+            if (level === "extreme") window.waterBreakIntervalMins = 10;
+            else if (level === "high") window.waterBreakIntervalMins = 15;
+            else if (level === "elevated") window.waterBreakIntervalMins = 20;
+            else window.waterBreakIntervalMins = 30;
+        }
 
-            let intervalMins = 30;
-            let breakDuration = 4;
+        // Trigger Transition Water Break
+        function triggerTransitionWaterBreak() {
+            if (!window.isMasterOperator) return;
+            const breakSecs = 240; // 4 minutes
+            const updatedTimer = {
+                activePeriodIndex: window.activePeriodIndex,
+                isRunning: false,
+                endTimeMs: 0,
+                remainingSeconds: window.timerSeconds,
+                isInjuryTimeout: false,
+                isWaterOverride: true,
+                waterEndMs: Date.now() + (breakSecs * 1000),
+                continuousFieldSecs: 0,
+                waterBreakPending: false
+            };
+            window.syncedTimer = updatedTimer;
+            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
+            playWhistle();
+        }
 
-            if (heatLevel === "elevated") {
-                intervalMins = 20;
-                breakDuration = 4;
-            } else if (heatLevel === "high") {
-                intervalMins = 20;
-                breakDuration = 5;
-            } else if (heatLevel === "extreme") {
-                intervalMins = 15;
-                breakDuration = 5;
-            } else {
-                showToast("Normal weather rules restored.", true);
-                window.periods = cleanPeriods;
-                renderSchedule();
-                if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
-                return;
-            }
+        function endWaterBreakOverride() {
+            if (!window.isMasterOperator) return;
 
-            let newSchedule = [];
-            let accumulatedMins = 0;
+            const updatedTimer = {
+                activePeriodIndex: window.activePeriodIndex,
+                isRunning: false,
+                endTimeMs: 0,
+                remainingSeconds: window.timerSeconds,
+                isWaterOverride: false,
+                waterEndMs: 0,
+                continuousFieldSecs: 0,
+                waterBreakPending: false
+            };
+            window.syncedTimer = updatedTimer;
+            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
+            playWhistle();
+        }
 
-            cleanPeriods.forEach((period) => {
-                newSchedule.push(period);
-                accumulatedMins += parseInt(period.duration) || 0;
+        function startWaterOverrideTick() {
+            if (window.waterInterval) clearInterval(window.waterInterval);
 
-                if (accumulatedMins >= intervalMins && period.title !== "Warm Up" && period.title !== "Team Announcements") {
-                    newSchedule.push({
-                        id: Date.now() + Math.random(),
-                        title: "WATER / SHADE BREAK",
-                        duration: breakDuration,
-                        isFixed: false,
-                        options: ["Hydration & Helmets Off", "Ice Towels"],
-                        selectedDrills: ["Hydration & Helmets Off"],
-                        customNotes: "Mandatory Weather Hydration Protocol",
-                        attachedFiles: []
-                    });
-                    accumulatedMins = 0;
+            window.waterInterval = setInterval(() => {
+                if (window.syncedTimer.isWaterOverride) {
+                    const remaining = Math.max(0, Math.round((window.syncedTimer.waterEndMs - Date.now()) / 1000));
+                    const mins = Math.floor(remaining / 60);
+                    const secs = remaining % 60;
+                    document.getElementById('waterOverrideDisplay').textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+                    if (remaining <= 0) {
+                        clearInterval(window.waterInterval);
+                        window.waterInterval = null;
+                        playWhistle();
+                        if (window.isMasterOperator) endWaterBreakOverride();
+                    }
                 }
-            });
-
-            window.periods = newSchedule;
-            renderSchedule();
-            if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
-            showToast(`Inserted Hydration Breaks (${breakDuration} mins)!`, true);
+            }, 1000);
         }
 
         // Injury Delay Mechanics
@@ -603,7 +649,8 @@
                 endTimeMs: 0,
                 remainingSeconds: window.timerSeconds,
                 isInjuryTimeout: true,
-                injuryStartMs: Date.now()
+                injuryStartMs: Date.now(),
+                isWaterOverride: false
             };
             window.syncedTimer = updatedTimer;
             if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
@@ -616,7 +663,6 @@
             const elapsedMins = Math.ceil(elapsedSecs / 60);
 
             if (shiftSchedule && elapsedMins > 0) {
-                // Add injury delay to end time or shift practice start time
                 const startInput = document.getElementById('startTime').value || "15:00";
                 const [startHour, startMin] = startInput.split(':').map(Number);
                 let newTime = new Date();
@@ -710,18 +756,14 @@
             editablePeriods.forEach((period, actualIdx) => {
                 const idx = actualIdx + 1;
                 const optionsList = period.options || [];
-                const filesList = period.attachedFiles || [];
-                const isWaterBreak = period.title === "WATER / SHADE BREAK";
 
                 const card = document.createElement('div');
-                card.className = `rounded-xl border p-3 shadow-2xs transition print-card space-y-3 ${
-                    isWaterBreak ? 'bg-cyan-50/80 border-cyan-300' : 'bg-white border-slate-200 hover:border-slate-300'
-                }`;
+                card.className = "rounded-xl border p-3 shadow-2xs transition print-card space-y-3 bg-white border-slate-200 hover:border-slate-300";
 
                 card.innerHTML = `
                     <div class="flex flex-wrap justify-between items-center gap-2 pb-2 border-b border-slate-100">
                         <div class="flex items-center gap-2">
-                            <span class="${isWaterBreak ? 'bg-cyan-700' : 'bg-slate-900'} text-white text-[11px] font-black px-2 py-0.5 rounded">
+                            <span class="bg-slate-900 text-white text-[11px] font-black px-2 py-0.5 rounded">
                                 #${idx}
                             </span>
                             <input type="text" value="${escapeHtml(period.title)}" onchange="updatePeriodTitle(${idx}, this.value)" class="font-extrabold text-slate-800 text-sm bg-transparent focus:bg-slate-50 focus:outline-none rounded px-1">
@@ -912,21 +954,23 @@
             if (!isCurrentlyRunning) {
                 const endTimeMs = now + (window.timerSeconds * 1000);
                 const updatedTimer = {
-                    activePeriodIndex: window.activePeriodIndex,
+                    ...window.syncedTimer,
                     isRunning: true,
                     endTimeMs: endTimeMs,
                     remainingSeconds: window.timerSeconds,
-                    isInjuryTimeout: false
+                    isInjuryTimeout: false,
+                    isWaterOverride: false
                 };
                 window.syncedTimer = updatedTimer;
                 if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
             } else {
                 const updatedTimer = {
-                    activePeriodIndex: window.activePeriodIndex,
+                    ...window.syncedTimer,
                     isRunning: false,
                     endTimeMs: 0,
                     remainingSeconds: window.timerSeconds,
-                    isInjuryTimeout: false
+                    isInjuryTimeout: false,
+                    isWaterOverride: false
                 };
                 window.syncedTimer = updatedTimer;
                 if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
@@ -939,11 +983,12 @@
             const secs = (parseInt(current?.duration) || 0) * 60;
             
             const updatedTimer = {
-                activePeriodIndex: window.activePeriodIndex,
+                ...window.syncedTimer,
                 isRunning: false,
                 endTimeMs: 0,
                 remainingSeconds: secs,
-                isInjuryTimeout: false
+                isInjuryTimeout: false,
+                isWaterOverride: false
             };
             window.syncedTimer = updatedTimer;
             if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
@@ -951,17 +996,26 @@
 
         function nextSyncedPeriod() {
             if (!window.isMasterOperator) return;
+
+            // If a water break was queued or threshold met, trigger break BEFORE advancing
+            if (window.syncedTimer.waterBreakPending || (window.syncedTimer.continuousFieldSecs >= window.waterBreakIntervalMins * 60)) {
+                triggerTransitionWaterBreak();
+                return;
+            }
+
             if (window.activePeriodIndex < window.periods.length - 1) {
                 const nextIdx = window.activePeriodIndex + 1;
                 const nextPeriodObj = window.periods[nextIdx];
                 const secs = (parseInt(nextPeriodObj?.duration) || 0) * 60;
 
                 const updatedTimer = {
+                    ...window.syncedTimer,
                     activePeriodIndex: nextIdx,
                     isRunning: false,
                     endTimeMs: 0,
                     remainingSeconds: secs,
-                    isInjuryTimeout: false
+                    isInjuryTimeout: false,
+                    isWaterOverride: false
                 };
                 window.syncedTimer = updatedTimer;
                 if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
@@ -978,11 +1032,13 @@
                 const secs = (parseInt(prevPeriodObj?.duration) || 0) * 60;
 
                 const updatedTimer = {
+                    ...window.syncedTimer,
                     activePeriodIndex: prevIdx,
                     isRunning: false,
                     endTimeMs: 0,
                     remainingSeconds: secs,
-                    isInjuryTimeout: false
+                    isInjuryTimeout: false,
+                    isWaterOverride: false
                 };
                 window.syncedTimer = updatedTimer;
                 if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
@@ -993,10 +1049,21 @@
             if (window.timerInterval) clearInterval(window.timerInterval);
 
             window.timerInterval = setInterval(() => {
-                if (window.syncedTimer.isRunning && !window.syncedTimer.isInjuryTimeout) {
+                if (window.syncedTimer.isRunning && !window.syncedTimer.isInjuryTimeout && !window.syncedTimer.isWaterOverride) {
                     const now = Date.now();
                     const remaining = Math.max(0, Math.round((window.syncedTimer.endTimeMs - now) / 1000));
                     window.timerSeconds = remaining;
+                    
+                    // Track elapsed active field time
+                    window.syncedTimer.continuousFieldSecs = (window.syncedTimer.continuousFieldSecs || 0) + 1;
+                    
+                    // Flag pending water break if threshold passed during active drill
+                    const safetyLimitSecs = window.waterBreakIntervalMins * 60;
+                    if (window.syncedTimer.continuousFieldSecs >= safetyLimitSecs && !window.syncedTimer.waterBreakPending) {
+                        window.syncedTimer.waterBreakPending = true;
+                        if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(window.syncedTimer);
+                    }
+
                     updateTimerDisplay();
 
                     if (remaining <= 0) {
@@ -1068,3 +1135,4 @@
     </script>
 </body>
 </html>
+
