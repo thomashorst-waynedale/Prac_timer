@@ -131,7 +131,7 @@
 
                 <div class="flex items-center gap-2">
                     <select id="heatIndexSelect" onchange="updateWeatherRules()" class="bg-white border border-cyan-300 text-cyan-950 text-xs font-bold rounded-md px-2 py-1 focus:outline-none">
-                        <option value="normal">Normal (< 79.7°F) • Water break between periods (~30m)</option>
+                        <option value="normal">Normal (&lt; 79.7°F) • Water break between periods (~30m)</option>
                         <option value="elevated">Caution (79.8°-84.6°F) • Water break between periods (~20m)</option>
                         <option value="high">Warning (84.7°-87.6°F) • Water break between periods (~15m)</option>
                         <option value="extreme">Extreme (87.8°-89.7°F) • Water break between periods (~10m)</option>
@@ -317,17 +317,24 @@
     <!-- Firebase SDK Setup & Synchronized Engine -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const firebaseConfig = typeof __firebase_config !== 'undefined' 
-            ? JSON.parse(__firebase_config) 
-            : { apiKey: "", authDomain: "", projectId: "ms-football-planner", storageBucket: "", messagingSenderId: "", appId: "" };
+        // Your Hardcoded Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyB2sRgw1vPNoKJZh63pGq_KRIZDy55SXpY",
+            authDomain: "prac-planner.firebaseapp.com",
+            projectId: "prac-planner",
+            storageBucket: "prac-planner.firebasestorage.app",
+            messagingSenderId: "1090505563199",
+            appId: "1:1090505563199:web:ec81dffbfae00e03c42c8a",
+            measurementId: "G-QKDMRPK1HZ"
+        };
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'ms-football-planner';
+        const appId = "prac-planner";
 
         let currentUser = null;
         let isRemoteUpdate = false;
@@ -348,11 +355,7 @@
 
         const initAuth = async () => {
             try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
+                await signInAnonymously(auth);
             } catch (err) {
                 console.error("Auth init error:", err);
             }
@@ -993,7 +996,6 @@
             const now = Date.now();
 
             if (!isCurrentlyRunning) {
-                // Fail-safe: if timerSeconds is 0, auto-fill from period duration
                 if (!window.timerSeconds || window.timerSeconds <= 0) {
                     const current = window.periods[window.activePeriodIndex];
                     window.timerSeconds = (parseInt(current?.duration) || 10) * 60;
