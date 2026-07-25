@@ -50,6 +50,7 @@
     onAuthStateChanged(auth, (user) => {
       if (user) {
         console.log("Authenticated anonymously as:", user.uid);
+        // Start date listener once authenticated
         const datePicker = document.getElementById("practice-date-picker");
         const today = new Date().toISOString().split('T')[0];
         if (datePicker) {
@@ -78,7 +79,8 @@
         padding: 0 !important;
         margin: 0 !important;
       }
-      .practice-card {
+      /* Target your existing cards to make them print-friendly */
+      div[class*="bg-gray-800 border-gray-700"] {
         background-color: white !important;
         border: 1px solid #333 !important;
         color: black !important;
@@ -94,7 +96,11 @@
         font-weight: bold !important;
         padding: 0 !important;
       }
-      .tag-chip {
+      input::placeholder {
+        color: transparent !important;
+      }
+      /* Target your existing drill tags */
+      span[class*="bg-amber-500/10"] {
         border: 1px solid #666 !important;
         color: black !important;
         background: #f0f0f0 !important;
@@ -102,10 +108,13 @@
         padding: 1px 4px !important;
       }
       .print-header {
-        display: block !important;
+        display: flex !important;
+        justify-content: space-between;
+        align-items: center;
         border-bottom: 2px solid black;
         margin-bottom: 12px;
         padding-bottom: 4px;
+        color: black !important;
       }
     }
     .print-header {
@@ -116,9 +125,9 @@
 <body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col font-sans antialiased">
 
   <!-- Printable Header (Visible only when printing) -->
-  <div class="print-header flex justify-between items-center">
+  <div class="print-header px-4 pt-4">
     <div>
-      <h1 class="text-2xl font-black uppercase tracking-wider">PRACTICE PLAN</h1>
+      <h1 class="text-2xl font-black uppercase tracking-wider">Practice Plan</h1>
       <p id="print-date-display" class="text-sm font-bold text-gray-700"></p>
     </div>
     <div class="text-right">
@@ -133,9 +142,8 @@
       <h1 class="font-black text-lg text-amber-500 tracking-wider uppercase">Coach Hub</h1>
     </div>
 
-    <!-- Controls & Actions -->
-    <div class="flex items-center gap-2 flex-wrap">
-      <!-- Date Selector -->
+    <!-- Date Picker & Controls -->
+    <div class="flex items-center gap-3 flex-wrap">
       <div class="flex items-center gap-2 bg-gray-900 px-3 py-1.5 rounded-lg border border-gray-700">
         <label for="practice-date-picker" class="font-semibold text-xs text-gray-400 uppercase">Date:</label>
         <input 
@@ -146,7 +154,7 @@
         />
       </div>
 
-      <!-- Template Actions -->
+      <!-- New Template & Print Buttons -->
       <button 
         onclick="window.saveAsTemplatePrompt()" 
         class="bg-gray-700 hover:bg-gray-600 text-amber-400 font-bold px-3 py-1.5 rounded-lg text-xs uppercase tracking-wider transition border border-amber-500/30"
@@ -161,7 +169,6 @@
         📂 Load Template
       </button>
 
-      <!-- Print Button -->
       <button 
         onclick="window.print()" 
         class="bg-amber-500 hover:bg-amber-600 text-gray-950 font-black px-3 py-1.5 rounded-lg text-xs tracking-wider uppercase transition shadow-md"
@@ -169,7 +176,6 @@
         🖨️ Print Plan
       </button>
 
-      <!-- Injury Pause -->
       <button 
         onclick="window.toggleInjuryTimeout()" 
         id="injury-btn"
@@ -185,21 +191,21 @@
     <div class="flex items-center gap-2">
       <span id="weather-temp" class="font-bold">--°F</span>
       <span class="text-amber-500">|</span>
-      <span id="hydration-status" class="font-medium">OHSAA Hydration Rules Active</span>
+      <span id="hydration-status" class="font-medium">Checking OHSAA Hydration Compliance...</span>
     </div>
-    <span class="text-amber-400/60 text-[10px]">Middle School Staff Sync</span>
+    <span class="text-amber-400/60 text-[10px]">OHSAA Rules Active</span>
   </div>
 
   <!-- Main Schedule Canvas -->
-  <main class="flex-1 max-w-4xl w-full mx-auto p-4 space-y-3">
-    <div id="schedule-container" class="space-y-2">
+  <main class="flex-1 max-w-4xl w-full mx-auto p-4 space-y-4">
+    <div id="schedule-container" class="space-y-3">
       <!-- Dynamic Periods Rendered Here -->
     </div>
 
-    <!-- Add Period Button -->
+    <!-- Add Period Button (Hidden on Print) -->
     <button 
       onclick="window.addNewPeriod()" 
-      class="no-print w-full py-2.5 border-2 border-dashed border-gray-700 hover:border-amber-500 text-gray-400 hover:text-amber-400 font-bold rounded-xl transition text-xs uppercase tracking-wider flex items-center justify-center gap-2"
+      class="no-print w-full py-3 border-2 border-dashed border-gray-700 hover:border-amber-500 text-gray-400 hover:text-amber-400 font-bold rounded-xl transition text-sm uppercase tracking-wider flex items-center justify-center gap-2"
     >
       <span>+</span> Add Practice Block
     </button>
@@ -207,6 +213,7 @@
 
   <!-- Global Application Logic -->
   <script>
+    // Master Drill Bank Categorized by Block Type
     window.MASTER_DRILL_BANK = {
       "Warm Up": ["Dynamic Warmup", "High Knees / Butt Kicks", "Form Running & Striders"],
       "Blood Pumper": ["Take Off & Read", "Pursuit & Swarm", "Oklahoma / Fast Alignment"],
@@ -217,36 +224,41 @@
       "Team Announcements": ["Game Prep", "Equipment Check", "Next Practice Info", "Parent/Roster Reminders"]
     };
 
+    // Default Template Structure
     function getDefaultPeriods() {
       return [
-        { id: 1, title: "Warm Up", duration: 10, notes: "Dynamic stretch & lines", options: ["Dynamic Warmup"] },
-        { id: 2, title: "Blood Pumper", duration: 5, notes: "Fast pace alignment test", options: ["Pursuit & Swarm"] },
-        { id: 3, title: "Indy / Group", duration: 20, notes: "Position-specific fundamentals", options: ["Drive & Lock Out", "W-Drill Backpedal"] },
-        { id: 4, title: "Stations / Team Build", duration: 15, notes: "Tackling & turnover safety circuit", options: ["Hit, Wrap & Lift"] },
-        { id: 5, title: "Group / Team", duration: 20, notes: "Game script execution", options: ["7v7 / Inside Run Split"] },
-        { id: 6, title: "Conditioning", duration: 10, notes: "Finish strong", options: ["Gassers"] }
+        { id: 1, title: "Warm Up", duration: 10, notes: "Dynamic stretch & lines", options: ["Dynamic Warmup"], selectedDrills: ["Dynamic Warmup"] },
+        { id: 2, title: "Blood Pumper", duration: 5, notes: "Fast pace alignment test", options: ["Pursuit & Swarm"], selectedDrills: ["Pursuit & Swarm"] },
+        { id: 3, title: "Indy / Group", duration: 20, notes: "Position-specific fundamentals", options: ["Drive & Lock Out", "W-Drill Backpedal"], selectedDrills: ["Drive & Lock Out"] },
+        { id: 4, title: "Stations / Team Build", duration: 15, notes: "Tackling & turnover safety circuit", options: ["Hit, Wrap & Lift"], selectedDrills: ["Hit, Wrap & Lift"] },
+        { id: 5, title: "Group / Team", duration: 20, notes: "Game script execution", options: ["7v7 / Inside Run Split"], selectedDrills: ["7v7 / Inside Run Split"] },
+        { id: 6, title: "Conditioning", duration: 10, notes: "Finish strong", options: ["Gassers"], selectedDrills: ["Gassers"] }
       ];
     }
 
+    // State Variables
     window.currentPracticeDate = new Date().toISOString().split('T')[0];
     window.periods = getDefaultPeriods();
     window.activeDateUnsubscribe = null;
     window.isInjuryPaused = false;
 
-    // Switch and Sync Date-Based Plans
+    // Switch and Listen to Date-Based Practice Plans
     window.switchPracticeDate = function(dateStr) {
       if (!dateStr) return;
       window.currentPracticeDate = dateStr;
 
+      // Update printable header date
       const printDisplay = document.getElementById("print-date-display");
       if (printDisplay) printDisplay.innerText = `Date: ${dateStr}`;
 
+      // Clean up previous real-time listener if switching
       if (window.activeDateUnsubscribe) {
         window.activeDateUnsubscribe();
       }
 
       if (!window.db || !window.doc || !window.onSnapshot) return;
 
+      // Target permanent document by date string (e.g. "2026-08-03")
       const docRef = window.doc(window.db, "artifacts", "prac-planner", "public", "data", "practice_plans", dateStr);
 
       window.activeDateUnsubscribe = window.onSnapshot(docRef, (docSnap) => {
@@ -254,8 +266,9 @@
           const data = docSnap.data();
           window.periods = data.periods || [];
         } else {
+          // If no plan exists for this date yet, load default schedule template
           window.periods = getDefaultPeriods();
-          window.savePracticeForDate(dateStr);
+          window.savePracticeForDate(dateStr); // Auto-initialize doc in cloud
         }
         renderSchedule();
       }, (err) => {
@@ -263,7 +276,7 @@
       });
     };
 
-    // Save Active Plan to Cloud
+    // Save Current Practice Data to Firestore
     window.savePracticeForDate = async function(dateStr) {
       if (!window.db || !window.doc || !window.setDoc) return;
 
@@ -340,14 +353,17 @@
       if (selection && selection.trim()) {
         const tag = selection.trim();
         if (!window.periods[idx].options) window.periods[idx].options = [];
+        if (!window.periods[idx].selectedDrills) window.periods[idx].selectedDrills = [];
+        
         window.periods[idx].options.push(tag);
+        window.periods[idx].selectedDrills.push(tag);
         
         renderSchedule();
         window.savePracticeForDate(window.currentPracticeDate);
       }
     };
 
-    // Render Function
+    // UI Render Routine
     function renderSchedule() {
       const container = document.getElementById("schedule-container");
       if (!container) return;
@@ -356,59 +372,59 @@
 
       window.periods.forEach((period, idx) => {
         const card = document.createElement("div");
-        card.className = "practice-card bg-gray-800 border border-gray-700 rounded-xl p-3 shadow-sm hover:border-gray-600 transition";
+        card.className = "bg-gray-800 border border-gray-700 rounded-xl p-4 shadow-sm hover:border-gray-600 transition";
 
         const tagsHtml = (period.options || []).map(opt => `
-          <span class="tag-chip inline-block bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs px-2 py-0.5 rounded font-semibold mr-1 mb-1">
+          <span class="inline-block bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs px-2.5 py-1 rounded-md font-semibold mr-1.5 mb-1">
             ${opt}
           </span>
         `).join("");
 
         card.innerHTML = `
-          <div class="flex items-center justify-between gap-2 mb-1">
-            <div class="flex items-center gap-2">
-              <span class="text-xs font-black text-gray-500 w-4">#${idx + 1}</span>
+          <div class="flex items-center justify-between gap-3 mb-2">
+            <div class="flex items-center gap-3">
+              <span class="text-xs font-black text-gray-500 w-5">#${idx + 1}</span>
               <input 
                 type="text" 
                 value="${period.title}" 
                 onchange="window.updatePeriodTitle(${idx}, this.value)"
-                class="bg-transparent font-bold text-white text-sm focus:outline-none focus:border-b border-amber-500"
+                class="bg-transparent font-bold text-white text-base focus:outline-none focus:border-b border-amber-500"
               />
             </div>
-            <div class="flex items-center gap-1">
+            <div class="flex items-center gap-2">
               <input 
                 type="number" 
                 value="${period.duration}" 
                 onchange="window.updatePeriodDuration(${idx}, this.value)"
-                class="w-10 text-center bg-gray-900 text-amber-400 font-bold py-0.5 rounded border border-gray-700 text-xs focus:outline-none"
+                class="w-12 text-center bg-gray-900 text-amber-400 font-bold py-1 rounded border border-gray-700 text-sm focus:outline-none"
               />
               <span class="text-xs text-gray-400 font-medium">min</span>
             </div>
           </div>
 
-          <div class="mb-2">
+          <div class="mb-3">
             <input 
               type="text" 
               placeholder="Add practice notes or coaching points..." 
               value="${period.notes || ''}" 
               onchange="window.updatePeriodNotes(${idx}, this.value)"
-              class="w-full bg-gray-900/50 text-gray-300 text-xs p-1.5 rounded border border-gray-700/50 focus:outline-none"
+              class="w-full bg-gray-900/50 text-gray-300 text-xs p-2 rounded border border-gray-700/50 focus:outline-none focus:border-gray-600"
             />
           </div>
 
-          <div class="flex items-center justify-between pt-1 border-t border-gray-700/40">
+          <div class="flex items-center justify-between pt-2 border-t border-gray-700/50">
             <div class="flex flex-wrap items-center">
               ${tagsHtml}
               <button 
                 onclick="window.addDrillOptionPrompt(${idx})" 
-                class="no-print text-[11px] text-amber-500 hover:text-amber-400 font-bold px-1.5 py-0.5 rounded border border-amber-500/30 hover:border-amber-500 transition mb-1"
+                class="no-print text-xs text-amber-500 hover:text-amber-400 font-bold px-2 py-1 rounded border border-amber-500/30 hover:border-amber-500 transition mb-1"
               >
                 + Tag Drill
               </button>
             </div>
             <button 
               onclick="window.removePeriod(${idx})" 
-              class="no-print text-gray-500 hover:text-red-400 text-xs px-1 py-0.5 transition"
+              class="no-print text-gray-500 hover:text-red-400 text-xs px-2 py-1 transition"
             >
               Delete
             </button>
@@ -441,7 +457,8 @@
         title: "Indy / Group",
         duration: 10,
         notes: "",
-        options: []
+        options: [],
+        selectedDrills: []
       });
       renderSchedule();
       window.savePracticeForDate(window.currentPracticeDate);
@@ -465,6 +482,7 @@
       }
     };
 
+    // Initial Render on Page Load
     document.addEventListener("DOMContentLoaded", () => {
       renderSchedule();
     });
