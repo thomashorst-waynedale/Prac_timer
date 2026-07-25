@@ -320,7 +320,6 @@
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Your Hardcoded Firebase Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyB2sRgw1vPNoKJZh63pGq_KRIZDy55SXpY",
             authDomain: "prac-planner.firebaseapp.com",
@@ -472,13 +471,6 @@
             if (window.lucide && typeof window.lucide.createIcons === 'function') {
                 try { window.lucide.createIcons(); } catch (e) { }
             }
-        }
-
-        if (typeof window.syncActivePracticeToCloud !== 'function') {
-            window.syncActivePracticeToCloud = async function() {};
-        }
-        if (typeof window.saveCurrentPractice !== 'function') {
-            window.saveCurrentPractice = async function() { showToast("Local Mode Active", false); };
         }
 
         const DEFAULT_PRACTICE_BLOCKS = [
@@ -751,7 +743,7 @@
 
             let totalMinutes = 0;
 
-            const timeMapped = window.periods.map(p => {
+            const timeMapped = (window.periods || DEFAULT_PRACTICE_BLOCKS).map(p => {
                 const startTimeStr = formatTime(currentTime);
                 const dur = parseInt(p.duration) || 0;
                 totalMinutes += dur;
@@ -956,7 +948,7 @@
         };
 
         window.setupTimerPeriodDisplay = function() {
-            const current = window.periods[window.activePeriodIndex];
+            const current = (window.periods || DEFAULT_PRACTICE_BLOCKS)[window.activePeriodIndex];
             if (!current) return;
 
             document.getElementById('timerPeriodBadge').textContent = `PERIOD ${window.activePeriodIndex + 1}`;
@@ -967,7 +959,7 @@
 
             updateTimerDisplay();
 
-            const next = window.periods[window.activePeriodIndex + 1];
+            const next = (window.periods || DEFAULT_PRACTICE_BLOCKS)[window.activePeriodIndex + 1];
             if (next) {
                 document.getElementById('nextPeriodTitle').textContent = `${next.title} — ${(next.selectedDrills || []).join(', ')}`;
                 document.getElementById('nextPeriodTime').textContent = `${next.duration} Mins`;
@@ -997,7 +989,7 @@
 
             if (!isCurrentlyRunning) {
                 if (!window.timerSeconds || window.timerSeconds <= 0) {
-                    const current = window.periods[window.activePeriodIndex];
+                    const current = (window.periods || DEFAULT_PRACTICE_BLOCKS)[window.activePeriodIndex];
                     window.timerSeconds = (parseInt(current?.duration) || 10) * 60;
                 }
 
@@ -1030,7 +1022,7 @@
 
         window.resetSyncedTimer = function() {
             if (!window.isMasterOperator) return;
-            const current = window.periods[window.activePeriodIndex];
+            const current = (window.periods || DEFAULT_PRACTICE_BLOCKS)[window.activePeriodIndex];
             const secs = (parseInt(current?.duration) || 10) * 60;
             
             const updatedTimer = {
@@ -1055,9 +1047,9 @@
                 return;
             }
 
-            if (window.activePeriodIndex < window.periods.length - 1) {
+            if (window.activePeriodIndex < (window.periods || DEFAULT_PRACTICE_BLOCKS).length - 1) {
                 const nextIdx = window.activePeriodIndex + 1;
-                const nextPeriodObj = window.periods[nextIdx];
+                const nextPeriodObj = (window.periods || DEFAULT_PRACTICE_BLOCKS)[nextIdx];
                 const secs = (parseInt(nextPeriodObj?.duration) || 10) * 60;
 
                 const updatedTimer = {
@@ -1082,7 +1074,7 @@
             if (!window.isMasterOperator) return;
             if (window.activePeriodIndex > 0) {
                 const prevIdx = window.activePeriodIndex - 1;
-                const prevPeriodObj = window.periods[prevIdx];
+                const prevPeriodObj = (window.periods || DEFAULT_PRACTICE_BLOCKS)[prevIdx];
                 const secs = (parseInt(prevPeriodObj?.duration) || 10) * 60;
 
                 const updatedTimer = {
@@ -1219,7 +1211,7 @@
                     const diffSecs = Math.max(0, Math.round((incoming.endTimeMs - now) / 1000));
                     window.timerSeconds = diffSecs;
                 } else {
-                    window.timerSeconds = incoming.remainingSeconds || (window.periods[window.activePeriodIndex]?.duration * 60) || 600;
+                    window.timerSeconds = incoming.remainingSeconds || ((window.periods || DEFAULT_PRACTICE_BLOCKS)[window.activePeriodIndex]?.duration * 60) || 600;
                 }
             }
 
