@@ -68,6 +68,10 @@
                     <i data-lucide="folder-open" class="w-3.5 h-3.5"></i> Load Template
                 </button>
 
+                <button onclick="window.openStatsModal()" class="bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-xs transition">
+                    <i data-lucide="bar-chart-2" class="w-3.5 h-3.5"></i> Season Stats
+                </button>
+
                 <button onclick="toggleHistoryModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-xs transition">
                     <i data-lucide="history" class="w-3.5 h-3.5"></i> Staff History
                 </button>
@@ -112,7 +116,8 @@
                 <div class="flex items-center gap-3 flex-wrap flex-1">
                     <div class="flex items-center gap-2">
                         <label class="text-xs font-bold text-slate-500 uppercase">Date:</label>
-                        <input type="date" id="practiceDate" onchange="window.switchPracticeDate(this.value)" class="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-semibold focus:outline-none">
+                        <!-- CHANGING DATE HERE SYNCS WITH THAT SPECIFIC DAY IN THE CLOUD -->
+                        <input type="date" id="practiceDate" onchange="window.switchPracticeDate(this.value)" class="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-semibold focus:outline-none cursor-pointer">
                     </div>
                     <div class="flex items-center gap-2">
                         <label class="text-xs font-bold text-slate-500 uppercase">Start:</label>
@@ -192,6 +197,32 @@
             <div id="periodsContainer" class="space-y-3"></div>
         </div>
     </main>
+
+    <!-- Season Analytics Modal -->
+    <div id="statsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-xs z-50 hidden flex justify-center items-center p-4 no-print">
+        <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl p-5 space-y-4 max-h-[90vh] flex flex-col border border-slate-100">
+            <div class="flex justify-between items-center border-b pb-3">
+                <div class="flex items-center gap-2.5">
+                    <span class="p-2 bg-teal-50 text-teal-600 rounded-lg"><i data-lucide="bar-chart-2" class="w-5 h-5"></i></span>
+                    <div>
+                        <h2 class="font-black text-lg text-slate-900">2026 Season Analytics</h2>
+                        <p class="text-xs text-slate-500 font-medium">Total minutes invested across all practice dates</p>
+                    </div>
+                </div>
+                <button onclick="window.closeStatsModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <div id="statsLoading" class="text-center py-10 text-slate-400 font-bold text-sm hidden">
+                <i data-lucide="loader-2" class="w-6 h-6 animate-spin mx-auto mb-2"></i> Calculating Season Totals...
+            </div>
+            
+            <div id="statsContent" class="flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-2">
+                <!-- Rendered Stats Go Here -->
+            </div>
+        </div>
+    </div>
 
     <!-- History Log Modal -->
     <div id="historyModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-xs z-50 hidden flex justify-center items-center p-4 no-print">
@@ -328,7 +359,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, doc, setDoc, deleteDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, doc, setDoc, deleteDoc, onSnapshot, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyB2sRgw1vPNoKJZh63pGq_KRIZDy55SXpY",
@@ -344,6 +375,7 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
         const appId = "prac-planner";
+        window.db = db; // Export to window for modal usage
 
         let currentUser = null;
         let isRemoteUpdate = false;
@@ -393,7 +425,7 @@
             }, (err) => console.error("History snapshot error:", err));
         }
 
-        // Switch listeners when the date changes
+        // Switch listeners when the date changes - This saves directly to the specific date file
         window.switchPracticeDate = function(dateStr) {
             if (!dateStr) return;
             
@@ -463,6 +495,92 @@
             } catch (err) {
                 console.error("Cloud sync error:", err);
             }
+        };
+
+        // --- Season Analytics Logic ---
+        window.openStatsModal = async function() {
+            if (!currentUser) return;
+            
+            const modal = document.getElementById('statsModal');
+            const content = document.getElementById('statsContent');
+            const loader = document.getElementById('statsLoading');
+            
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            content.innerHTML = '';
+            loader.classList.remove('hidden');
+
+            try {
+                // Fetch all dates from practice_plans to get the absolute truth of the calendar
+                const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'practice_plans');
+                const snap = await getDocs(colRef);
+                
+                const drillMinutes = {};
+                let totalSeasonMinutes = 0;
+
+                snap.forEach(docSnap => {
+                    const data = docSnap.data();
+                    (data.periods || []).forEach(p => {
+                        const dur = parseInt(p.duration) || 0;
+                        totalSeasonMinutes += dur;
+                        
+                        // Use selectedDrills if they exist, otherwise fallback to the block title
+                        const tags = (p.selectedDrills && p.selectedDrills.length > 0) ? p.selectedDrills : [p.title];
+                        tags.forEach(drill => {
+                            if (drill && drill.trim() !== '') {
+                                drillMinutes[drill] = (drillMinutes[drill] || 0) + dur;
+                            }
+                        });
+                    });
+                });
+
+                loader.classList.add('hidden');
+                
+                // Sort by minutes descending
+                const sortedDrills = Object.entries(drillMinutes).sort((a, b) => b[1] - a[1]);
+                
+                let html = `
+                    <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 mb-4 text-center">
+                        <div class="text-4xl font-black text-teal-600">${totalSeasonMinutes}</div>
+                        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Total Practice Minutes Planned</div>
+                    </div>
+                    <div class="space-y-2">
+                `;
+                
+                sortedDrills.forEach(([drill, mins]) => {
+                    const percentage = Math.min(100, Math.round((mins / totalSeasonMinutes) * 100)) || 0;
+                    html += `
+                        <div class="bg-white border border-slate-200 p-3 rounded-lg flex flex-col gap-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs font-bold text-slate-700">${escapeHtml(drill)}</span>
+                                <span class="text-xs font-black text-teal-600">${mins} mins</span>
+                            </div>
+                            <div class="w-full bg-slate-100 rounded-full h-1.5">
+                                <div class="bg-teal-500 h-1.5 rounded-full" style="width: ${percentage}%"></div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += `</div>`;
+                
+                if (totalSeasonMinutes === 0) {
+                    content.innerHTML = `<div class="text-center text-slate-400 text-xs py-5 font-bold">No practice data found yet. Build some plans!</div>`;
+                } else {
+                    content.innerHTML = html;
+                }
+
+            } catch (err) {
+                console.error("Stats Error:", err);
+                loader.classList.add('hidden');
+                content.innerHTML = `<div class="text-center text-rose-500 text-xs py-5 font-bold">Failed to load stats. Please try again.</div>`;
+            }
+        };
+
+        window.closeStatsModal = function() {
+            const modal = document.getElementById('statsModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
         };
 
         // Template logic
