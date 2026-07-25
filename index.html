@@ -59,7 +59,6 @@
             </div>
 
             <div class="flex items-center gap-2 flex-wrap">
-                <!-- New Template Buttons -->
                 <button onclick="window.saveAsTemplatePrompt()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 border border-slate-700 transition">
                     <i data-lucide="download" class="w-3.5 h-3.5"></i> Save Template
                 </button>
@@ -107,7 +106,7 @@
                 </label>
                 <span class="text-[10px] font-semibold text-amber-700">Real-time sync between coaches</span>
             </div>
-            <textarea id="staffNotes" rows="2" onchange="syncActivePracticeToCloud()" placeholder="Quick messages for coaches during the school day..." class="w-full bg-white/80 border border-amber-200 rounded-lg p-2 text-xs font-medium text-amber-950 focus:ring-2 focus:ring-amber-400 focus:outline-none"></textarea>
+            <textarea id="staffNotes" rows="2" oninput="syncActivePracticeToCloud()" placeholder="Quick messages for coaches during the school day..." class="w-full bg-white/80 border border-amber-200 rounded-lg p-2 text-xs font-medium text-amber-950 focus:ring-2 focus:ring-amber-400 focus:outline-none"></textarea>
         </div>
 
         <!-- Practice Overview Bar & Weather Engine -->
@@ -116,7 +115,6 @@
                 <div class="flex items-center gap-3 flex-wrap flex-1">
                     <div class="flex items-center gap-2">
                         <label class="text-xs font-bold text-slate-500 uppercase">Date:</label>
-                        <!-- CHANGING DATE HERE SYNCS WITH THAT SPECIFIC DAY IN THE CLOUD -->
                         <input type="date" id="practiceDate" onchange="window.switchPracticeDate(this.value)" class="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-semibold focus:outline-none cursor-pointer">
                     </div>
                     <div class="flex items-center gap-2">
@@ -170,15 +168,15 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1 border-t border-slate-100">
                 <div class="bg-emerald-50/50 rounded-lg p-2 border border-emerald-100">
                     <label class="block text-[11px] font-black text-emerald-800 uppercase mb-1">🎯 Today's Focus</label>
-                    <textarea id="todayFocus" rows="1" onchange="syncActivePracticeToCloud()" placeholder="Technique & Install focus..." class="w-full bg-white border border-emerald-200 rounded p-1.5 text-xs text-slate-800 focus:outline-none"></textarea>
+                    <textarea id="todayFocus" rows="1" oninput="syncActivePracticeToCloud()" placeholder="Technique & Install focus..." class="w-full bg-white border border-emerald-200 rounded p-1.5 text-xs text-slate-800 focus:outline-none"></textarea>
                 </div>
                 <div class="bg-blue-50/50 rounded-lg p-2 border border-blue-100">
                     <label class="block text-[11px] font-black text-blue-800 uppercase mb-1">👍 Yesterday's Good</label>
-                    <textarea id="yesterdayGood" rows="1" onchange="syncActivePracticeToCloud()" placeholder="Positives from yesterday..." class="w-full bg-white border border-blue-200 rounded p-1.5 text-xs text-slate-800 focus:outline-none"></textarea>
+                    <textarea id="yesterdayGood" rows="1" oninput="syncActivePracticeToCloud()" placeholder="Positives from yesterday..." class="w-full bg-white border border-blue-200 rounded p-1.5 text-xs text-slate-800 focus:outline-none"></textarea>
                 </div>
                 <div class="bg-rose-50/50 rounded-lg p-2 border border-rose-100">
                     <label class="block text-[11px] font-black text-rose-800 uppercase mb-1">⚠️ Needs Work</label>
-                    <textarea id="yesterdayBad" rows="1" onchange="syncActivePracticeToCloud()" placeholder="Areas to fix..." class="w-full bg-white border border-rose-200 rounded p-1.5 text-xs text-slate-800 focus:outline-none"></textarea>
+                    <textarea id="yesterdayBad" rows="1" oninput="syncActivePracticeToCloud()" placeholder="Areas to fix..." class="w-full bg-white border border-rose-200 rounded p-1.5 text-xs text-slate-800 focus:outline-none"></textarea>
                 </div>
             </div>
         </div>
@@ -218,9 +216,7 @@
                 <i data-lucide="loader-2" class="w-6 h-6 animate-spin mx-auto mb-2"></i> Calculating Season Totals...
             </div>
             
-            <div id="statsContent" class="flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-2">
-                <!-- Rendered Stats Go Here -->
-            </div>
+            <div id="statsContent" class="flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-2"></div>
         </div>
     </div>
 
@@ -375,7 +371,7 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
         const appId = "prac-planner";
-        window.db = db; // Export to window for modal usage
+        window.db = db;
 
         let currentUser = null;
         let isRemoteUpdate = false;
@@ -407,14 +403,14 @@
         onAuthStateChanged(auth, (user) => {
             currentUser = user;
             if (user) {
-                setupRealtimeStaffListeners(); // Start listening to history log
-                const initialDate = document.getElementById('practiceDate').value;
-                if(initialDate) window.switchPracticeDate(initialDate); // Sync active date
+                setupRealtimeStaffListeners();
+                const initialDate = document.getElementById('practiceDate').value || new Date().toISOString().split('T')[0];
+                document.getElementById('practiceDate').value = initialDate;
+                window.switchPracticeDate(initialDate);
             }
         });
 
         function setupRealtimeStaffListeners() {
-            // Listen to history list
             const historyColRef = collection(db, 'artifacts', appId, 'public', 'data', 'practice_history');
             onSnapshot(historyColRef, (snapshot) => {
                 const list = [];
@@ -425,7 +421,6 @@
             }, (err) => console.error("History snapshot error:", err));
         }
 
-        // Switch listeners when the date changes - This saves directly to the specific date file
         window.switchPracticeDate = function(dateStr) {
             if (!dateStr) return;
             
@@ -435,40 +430,33 @@
 
             const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'practice_plans', dateStr);
             window.activeDateUnsubscribe = onSnapshot(docRef, (docSnap) => {
+                isRemoteUpdate = true;
                 if (docSnap.exists()) {
                     const data = docSnap.data();
-                    if (data.lastUpdatedBy !== currentUser?.uid) {
-                        isRemoteUpdate = true;
-                        if (data.startTime) document.getElementById('startTime').value = data.startTime;
-                        if (data.gear) document.getElementById('gearSelect').value = data.gear;
-                        if (data.todayFocus !== undefined) document.getElementById('todayFocus').value = data.todayFocus;
-                        if (data.yesterdayGood !== undefined) document.getElementById('yesterdayGood').value = data.yesterdayGood;
-                        if (data.yesterdayBad !== undefined) document.getElementById('yesterdayBad').value = data.yesterdayBad;
-                        if (data.staffNotes !== undefined) document.getElementById('staffNotes').value = data.staffNotes;
-                        
-                        if (data.periods && Array.isArray(data.periods)) {
-                            window.periods = JSON.parse(JSON.stringify(data.periods));
-                        }
-                        if (typeof window.renderSchedule === 'function') window.renderSchedule();
-                        isRemoteUpdate = false;
+                    document.getElementById('startTime').value = data.startTime || "15:00";
+                    document.getElementById('gearSelect').value = data.gear || "Full Pads";
+                    document.getElementById('todayFocus').value = data.todayFocus || "";
+                    document.getElementById('yesterdayGood').value = data.yesterdayGood || "";
+                    document.getElementById('yesterdayBad').value = data.yesterdayBad || "";
+                    document.getElementById('staffNotes').value = data.staffNotes || "";
+                    
+                    if (data.periods && Array.isArray(data.periods)) {
+                        window.periods = JSON.parse(JSON.stringify(data.periods));
                     }
+                    if (typeof window.renderSchedule === 'function') window.renderSchedule();
 
                     if (data.syncedTimer && typeof window.handleIncomingSyncedTimer === 'function') {
                         window.handleIncomingSyncedTimer(data.syncedTimer);
                     }
                 } else {
-                    // Blank slate for new date
-                    isRemoteUpdate = true;
                     document.getElementById('todayFocus').value = "";
                     document.getElementById('yesterdayGood').value = "";
                     document.getElementById('yesterdayBad').value = "";
                     document.getElementById('staffNotes').value = "";
                     window.periods = typeof DEFAULT_PRACTICE_BLOCKS !== 'undefined' ? JSON.parse(JSON.stringify(DEFAULT_PRACTICE_BLOCKS)) : [];
                     if (typeof window.renderSchedule === 'function') window.renderSchedule();
-                    isRemoteUpdate = false;
-                    
-                    if (currentUser) window.syncActivePracticeToCloud();
                 }
+                isRemoteUpdate = false;
             }, (err) => console.error("Live active practice snapshot error:", err));
         };
 
@@ -497,7 +485,6 @@
             }
         };
 
-        // --- Season Analytics Logic ---
         window.openStatsModal = async function() {
             if (!currentUser) return;
             
@@ -511,7 +498,6 @@
             loader.classList.remove('hidden');
 
             try {
-                // Fetch all dates from practice_plans to get the absolute truth of the calendar
                 const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'practice_plans');
                 const snap = await getDocs(colRef);
                 
@@ -524,7 +510,6 @@
                         const dur = parseInt(p.duration) || 0;
                         totalSeasonMinutes += dur;
                         
-                        // Use selectedDrills if they exist, otherwise fallback to the block title
                         const tags = (p.selectedDrills && p.selectedDrills.length > 0) ? p.selectedDrills : [p.title];
                         tags.forEach(drill => {
                             if (drill && drill.trim() !== '') {
@@ -536,7 +521,6 @@
 
                 loader.classList.add('hidden');
                 
-                // Sort by minutes descending
                 const sortedDrills = Object.entries(drillMinutes).sort((a, b) => b[1] - a[1]);
                 
                 let html = `
@@ -583,7 +567,6 @@
             modal.classList.remove('flex');
         };
 
-        // Template logic
         window.saveAsTemplatePrompt = async function() {
             if (!currentUser) return typeof window.showToast === 'function' ? window.showToast("Connecting to cloud...", false) : null;
             const templateName = prompt("Enter a name for this practice template:\n(e.g., 'Full Pads Day', 'Light Walkthrough')");
@@ -696,15 +679,14 @@
         window.waterBreakIntervalMins = 30;
 
         document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('practiceDate').valueAsDate = new Date();
-            document.getElementById('todayFocus').value = "Execution & Fundamentals";
-            document.getElementById('yesterdayGood').value = "Great hustle during 7v7";
-            document.getElementById('yesterdayBad').value = "Tackling angles & Huddle tempo";
+            const dateInput = document.getElementById('practiceDate');
+            if (!dateInput.value) {
+                dateInput.valueAsDate = new Date();
+            }
             renderSchedule();
             safeRefreshIcons();
         });
 
-        // --- History Modal Functions ---
         window.toggleHistoryModal = function() {
             const modal = document.getElementById('historyModal');
             if (modal.classList.contains('hidden')) {
@@ -755,7 +737,6 @@
             safeRefreshIcons();
         };
 
-        // Weather API Auto Integration
         window.fetchLiveWeather = async function() {
             try {
                 showToast("Fetching local weather...", true);
@@ -802,10 +783,9 @@
             if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
         };
 
-        // Trigger Transition Water Break
         window.triggerTransitionWaterBreak = function() {
             if (!window.isMasterOperator) return;
-            const breakSecs = 240; // 4 minutes
+            const breakSecs = 240;
             const updatedTimer = {
                 ...window.syncedTimer,
                 isRunning: false,
@@ -862,7 +842,6 @@
             }, 1000);
         };
 
-        // Injury Delay Mechanics
         window.triggerInjuryTimeout = function() {
             if (!window.isMasterOperator) return;
             const updatedTimer = {
@@ -990,7 +969,7 @@
                             <span class="bg-slate-900 text-white text-[11px] font-black px-2 py-0.5 rounded">
                                 #${idx + 1}
                             </span>
-                            <input type="text" value="${escapeHtml(period.title)}" onchange="updatePeriodTitle(${idx}, this.value)" class="font-extrabold text-slate-800 text-sm bg-transparent focus:bg-slate-50 focus:outline-none rounded px-1 w-32 md:w-auto">
+                            <input type="text" value="${escapeHtml(period.title)}" oninput="updatePeriodTitle(${idx}, this.value)" class="font-extrabold text-slate-800 text-sm bg-transparent focus:bg-slate-50 focus:outline-none rounded px-1 w-32 md:w-auto">
                         </div>
 
                         <div class="flex items-center gap-2">
@@ -1036,7 +1015,7 @@
                     </div>
 
                     <div class="flex items-center gap-2 mt-1">
-                        <input type="text" value="${escapeHtml(period.customNotes || '')}" onchange="updatePeriodNotes(${idx}, this.value)" placeholder="Coaching script / play details..." class="w-full text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-800 focus:outline-none focus:border-emerald-500 transition">
+                        <input type="text" value="${escapeHtml(period.customNotes || '')}" oninput="updatePeriodNotes(${idx}, this.value)" placeholder="Coaching script / play details..." class="w-full text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-800 focus:outline-none focus:border-emerald-500 transition">
                     </div>
                 `;
 
@@ -1065,7 +1044,6 @@
 
         window.updatePeriodTitle = function(idx, val) {
             window.periods[idx].title = val;
-            renderSchedule();
             if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
         };
 
@@ -1083,7 +1061,6 @@
 
         window.updatePeriodNotes = function(idx, val) {
             window.periods[idx].customNotes = val;
-            renderSchedule();
             if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
         };
 
@@ -1108,7 +1085,6 @@
             if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud();
         };
 
-        // --- Sideline Timer Logic ---
         window.openTimerModal = function() {
             openTimerModalForPeriod(window.activePeriodIndex || 0);
         };
