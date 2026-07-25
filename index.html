@@ -243,7 +243,7 @@
                 <p id="timerPeriodDrills" class="text-amber-400 text-lg font-extrabold mt-1 max-w-xl mx-auto">Dynamic Warmup</p>
             </div>
 
-            <!-- Mandatory Weather Hydration Overlay Banner (Triggers Between Drills) -->
+            <!-- Mandatory Weather Hydration Overlay Banner -->
             <div id="waterBreakOverrideBanner" class="hidden bg-cyan-600 border border-cyan-300 text-white rounded-2xl p-4 shadow-xl space-y-2 animate-pulse">
                 <div class="flex justify-center items-center gap-2 font-black text-lg uppercase tracking-wide">
                     <i data-lucide="droplets" class="w-6 h-6 text-cyan-200"></i> MANDATORY HYDRATION & SHADE BREAK
@@ -279,7 +279,7 @@
                     </button>
 
                     <button id="playPauseBtn" onclick="toggleSyncedTimer()" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-6 py-3 rounded-xl font-black text-base shadow-lg transition transform active:scale-95 flex items-center gap-2">
-                        <i data-lucide="play" class="w-6 h-6 fill-current"></i> START
+                        <i data-lucide="play" class="w-6 h-6 fill-current"></i> <span id="playBtnText">START</span>
                     </button>
 
                     <button id="injuryBtn" onclick="triggerInjuryTimeout()" class="bg-rose-600 hover:bg-rose-500 text-white px-3.5 py-3 rounded-xl font-black text-xs flex items-center gap-1 shadow-lg transition transform active:scale-95">
@@ -310,7 +310,7 @@
         </div>
 
         <div class="text-center text-[10px] text-slate-600 max-w-4xl mx-auto w-full border-t border-slate-900 pt-2">
-            Middle School Gridiron Assistant • Transition Hydration Rules Active
+            Middle School Gridiron Assistant • Fail-Safe Timing Engine Active
         </div>
     </div>
 
@@ -402,7 +402,6 @@
             }, (err) => console.error("Live active practice snapshot error:", err));
         }
 
-        // Expose Cloud Functions to global window object
         window.syncActivePracticeToCloud = async function(timerDataToUpdate = null) {
             if (!currentUser || isRemoteUpdate) return;
             try {
@@ -466,15 +465,17 @@
 
     <!-- Main Application UI Logic -->
     <script>
-        // Fallbacks: If Firebase fails to load or isn't connected, ensure UI buttons don't crash
+        function safeRefreshIcons() {
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                try { window.lucide.createIcons(); } catch (e) { }
+            }
+        }
+
         if (typeof window.syncActivePracticeToCloud !== 'function') {
-            window.syncActivePracticeToCloud = async function() { console.log("Local mode active: Cloud sync disabled."); };
+            window.syncActivePracticeToCloud = async function() {};
         }
         if (typeof window.saveCurrentPractice !== 'function') {
-            window.saveCurrentPractice = async function() { showToast("Local Mode: Connect DB to save practice history.", false); };
-        }
-        if (typeof window.deleteHistoryRecord !== 'function') {
-            window.deleteHistoryRecord = async function() { console.log("Local mode active: Delete disabled."); };
+            window.saveCurrentPractice = async function() { showToast("Local Mode Active", false); };
         }
 
         const DEFAULT_PRACTICE_BLOCKS = [
@@ -502,10 +503,10 @@
             document.getElementById('yesterdayGood').value = "Great hustle during 7v7";
             document.getElementById('yesterdayBad').value = "Tackling angles & Huddle tempo";
             renderSchedule();
-            lucide.createIcons();
+            safeRefreshIcons();
         });
 
-        // --- History Modal Functions (RESTORED) ---
+        // --- History Modal Functions ---
         window.toggleHistoryModal = function() {
             const modal = document.getElementById('historyModal');
             if (modal.classList.contains('hidden')) {
@@ -553,7 +554,7 @@
                 `;
                 container.appendChild(div);
             });
-            lucide.createIcons();
+            safeRefreshIcons();
         };
 
         // Weather API Auto Integration
@@ -608,7 +609,7 @@
             if (!window.isMasterOperator) return;
             const breakSecs = 240; // 4 minutes
             const updatedTimer = {
-                activePeriodIndex: window.activePeriodIndex,
+                ...window.syncedTimer,
                 isRunning: false,
                 endTimeMs: 0,
                 remainingSeconds: window.timerSeconds,
@@ -619,6 +620,7 @@
                 waterBreakPending: false
             };
             window.syncedTimer = updatedTimer;
+            window.handleIncomingSyncedTimer(updatedTimer);
             if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
             playWhistle();
         };
@@ -627,7 +629,7 @@
             if (!window.isMasterOperator) return;
 
             const updatedTimer = {
-                activePeriodIndex: window.activePeriodIndex,
+                ...window.syncedTimer,
                 isRunning: false,
                 endTimeMs: 0,
                 remainingSeconds: window.timerSeconds,
@@ -637,6 +639,7 @@
                 waterBreakPending: false
             };
             window.syncedTimer = updatedTimer;
+            window.handleIncomingSyncedTimer(updatedTimer);
             if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
             playWhistle();
         };
@@ -665,7 +668,7 @@
         window.triggerInjuryTimeout = function() {
             if (!window.isMasterOperator) return;
             const updatedTimer = {
-                activePeriodIndex: window.activePeriodIndex,
+                ...window.syncedTimer,
                 isRunning: false,
                 endTimeMs: 0,
                 remainingSeconds: window.timerSeconds,
@@ -674,6 +677,7 @@
                 isWaterOverride: false
             };
             window.syncedTimer = updatedTimer;
+            window.handleIncomingSyncedTimer(updatedTimer);
             if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
         };
 
@@ -696,7 +700,7 @@
             }
 
             const updatedTimer = {
-                activePeriodIndex: window.activePeriodIndex,
+                ...window.syncedTimer,
                 isRunning: false,
                 endTimeMs: 0,
                 remainingSeconds: window.timerSeconds,
@@ -704,6 +708,7 @@
                 injuryStartMs: 0
             };
             window.syncedTimer = updatedTimer;
+            window.handleIncomingSyncedTimer(updatedTimer);
             if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
         };
 
@@ -840,7 +845,7 @@
                 container.appendChild(card);
             });
 
-            lucide.createIcons();
+            safeRefreshIcons();
         };
 
         window.selectDrill = function(idx, drill) {
@@ -911,18 +916,35 @@
         };
 
         window.openTimerModalForPeriod = function(pIdx) {
-            if (window.periods.length === 0) return;
+            if (!window.periods || window.periods.length === 0) return;
+            
             window.activePeriodIndex = pIdx;
-            
             const current = window.periods[pIdx];
-            window.timerSeconds = (parseInt(current.duration) || 0) * 60;
+            const secs = (parseInt(current?.duration) || 10) * 60;
             
-            setupTimerPeriodDisplay();
+            if (window.isMasterOperator) {
+                const updatedTimer = {
+                    ...window.syncedTimer,
+                    activePeriodIndex: pIdx,
+                    isRunning: false,
+                    endTimeMs: 0,
+                    remainingSeconds: secs,
+                    isInjuryTimeout: false,
+                    isWaterOverride: false
+                };
+                window.syncedTimer = updatedTimer;
+                window.timerSeconds = secs;
+                window.handleIncomingSyncedTimer(updatedTimer);
+                if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
+            } else {
+                window.handleIncomingSyncedTimer(window.syncedTimer);
+            }
+            
             toggleMasterRole(window.isMasterOperator);
             
             document.getElementById('timerModal').classList.remove('hidden');
             document.getElementById('timerModal').classList.add('flex');
-            lucide.createIcons();
+            safeRefreshIcons();
         };
 
         window.closeTimerModal = function() {
@@ -953,18 +975,16 @@
         };
 
         window.updateTimerDisplay = function() {
-            const mins = Math.floor(window.timerSeconds / 60);
-            const secs = window.timerSeconds % 60;
+            const secsToDisplay = Math.max(0, window.timerSeconds || 0);
+            const mins = Math.floor(secsToDisplay / 60);
+            const secs = secsToDisplay % 60;
             document.getElementById('bigTimerDisplay').textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
         };
 
         window.updateTimerButtonUI = function(isRunning) {
-            const btn = document.getElementById('playPauseBtn');
-            if (!btn) return;
-            btn.innerHTML = isRunning 
-                ? `<i data-lucide="pause" class="w-6 h-6 fill-current"></i> PAUSE`
-                : `<i data-lucide="play" class="w-6 h-6 fill-current"></i> START`;
-            lucide.createIcons();
+            const playText = document.getElementById('playBtnText');
+            if (playText) playText.textContent = isRunning ? "PAUSE" : "START";
+            safeRefreshIcons();
         };
 
         window.toggleSyncedTimer = function() {
@@ -973,6 +993,12 @@
             const now = Date.now();
 
             if (!isCurrentlyRunning) {
+                // Fail-safe: if timerSeconds is 0, auto-fill from period duration
+                if (!window.timerSeconds || window.timerSeconds <= 0) {
+                    const current = window.periods[window.activePeriodIndex];
+                    window.timerSeconds = (parseInt(current?.duration) || 10) * 60;
+                }
+
                 const endTimeMs = now + (window.timerSeconds * 1000);
                 const updatedTimer = {
                     ...window.syncedTimer,
@@ -983,6 +1009,7 @@
                     isWaterOverride: false
                 };
                 window.syncedTimer = updatedTimer;
+                window.handleIncomingSyncedTimer(updatedTimer);
                 if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
             } else {
                 const updatedTimer = {
@@ -994,6 +1021,7 @@
                     isWaterOverride: false
                 };
                 window.syncedTimer = updatedTimer;
+                window.handleIncomingSyncedTimer(updatedTimer);
                 if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
             }
         };
@@ -1001,7 +1029,7 @@
         window.resetSyncedTimer = function() {
             if (!window.isMasterOperator) return;
             const current = window.periods[window.activePeriodIndex];
-            const secs = (parseInt(current?.duration) || 0) * 60;
+            const secs = (parseInt(current?.duration) || 10) * 60;
             
             const updatedTimer = {
                 ...window.syncedTimer,
@@ -1012,13 +1040,14 @@
                 isWaterOverride: false
             };
             window.syncedTimer = updatedTimer;
+            window.timerSeconds = secs;
+            window.handleIncomingSyncedTimer(updatedTimer);
             if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
         };
 
         window.nextSyncedPeriod = function() {
             if (!window.isMasterOperator) return;
 
-            // If a water break was queued or threshold met, trigger break BEFORE advancing
             if (window.syncedTimer.waterBreakPending || (window.syncedTimer.continuousFieldSecs >= window.waterBreakIntervalMins * 60)) {
                 triggerTransitionWaterBreak();
                 return;
@@ -1027,7 +1056,7 @@
             if (window.activePeriodIndex < window.periods.length - 1) {
                 const nextIdx = window.activePeriodIndex + 1;
                 const nextPeriodObj = window.periods[nextIdx];
-                const secs = (parseInt(nextPeriodObj?.duration) || 0) * 60;
+                const secs = (parseInt(nextPeriodObj?.duration) || 10) * 60;
 
                 const updatedTimer = {
                     ...window.syncedTimer,
@@ -1039,6 +1068,8 @@
                     isWaterOverride: false
                 };
                 window.syncedTimer = updatedTimer;
+                window.timerSeconds = secs;
+                window.handleIncomingSyncedTimer(updatedTimer);
                 if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
             } else {
                 showToast("Practice Complete! Great job Coach!", true);
@@ -1050,7 +1081,7 @@
             if (window.activePeriodIndex > 0) {
                 const prevIdx = window.activePeriodIndex - 1;
                 const prevPeriodObj = window.periods[prevIdx];
-                const secs = (parseInt(prevPeriodObj?.duration) || 0) * 60;
+                const secs = (parseInt(prevPeriodObj?.duration) || 10) * 60;
 
                 const updatedTimer = {
                     ...window.syncedTimer,
@@ -1062,6 +1093,8 @@
                     isWaterOverride: false
                 };
                 window.syncedTimer = updatedTimer;
+                window.timerSeconds = secs;
+                window.handleIncomingSyncedTimer(updatedTimer);
                 if (window.syncActivePracticeToCloud) window.syncActivePracticeToCloud(updatedTimer);
             }
         };
@@ -1075,10 +1108,8 @@
                     const remaining = Math.max(0, Math.round((window.syncedTimer.endTimeMs - now) / 1000));
                     window.timerSeconds = remaining;
                     
-                    // Track elapsed active field time
                     window.syncedTimer.continuousFieldSecs = (window.syncedTimer.continuousFieldSecs || 0) + 1;
                     
-                    // Flag pending water break if threshold passed during active drill
                     const safetyLimitSecs = window.waterBreakIntervalMins * 60;
                     if (window.syncedTimer.continuousFieldSecs >= safetyLimitSecs && !window.syncedTimer.waterBreakPending) {
                         window.syncedTimer.waterBreakPending = true;
@@ -1121,7 +1152,7 @@
                 osc.start(ctx.currentTime);
                 osc.stop(ctx.currentTime + 0.6);
             } catch (e) {
-                console.log("Audio play blocked", e);
+                console.log("Audio play prevented", e);
             }
         };
 
@@ -1130,23 +1161,24 @@
             const toastMsg = document.getElementById('toastMsg');
             const toastIcon = document.getElementById('toastIcon');
 
-            toastMsg.textContent = msg;
-            toastIcon.className = isSuccess ? "w-4 h-4 text-emerald-400" : "w-4 h-4 text-rose-400";
+            if (toastMsg) toastMsg.textContent = msg;
+            if (toastIcon) toastIcon.className = isSuccess ? "w-4 h-4 text-emerald-400" : "w-4 h-4 text-rose-400";
             
-            toast.classList.remove('translate-y-20', 'opacity-0');
-            toast.classList.add('translate-y-0', 'opacity-100');
+            if (toast) {
+                toast.classList.remove('translate-y-20', 'opacity-0');
+                toast.classList.add('translate-y-0', 'opacity-100');
 
-            setTimeout(() => {
-                toast.classList.remove('translate-y-0', 'opacity-100');
-                toast.classList.add('translate-y-20', 'opacity-0');
-            }, 3000);
+                setTimeout(() => {
+                    toast.classList.remove('translate-y-0', 'opacity-100');
+                    toast.classList.add('translate-y-20', 'opacity-0');
+                }, 3000);
+            }
         };
 
         window.showConfirmModal = function(msg, onConfirm) {
             if (confirm(msg)) onConfirm();
         };
 
-        // Fixed Apostrophe Escaping Bug
         window.escapeHtml = function(str) {
             return String(str)
                 .replace(/&/g, '&amp;')
@@ -1156,7 +1188,6 @@
                 .replace(/'/g, '&#39;');
         };
 
-        // Required link between Module listener and Global logic
         window.handleIncomingSyncedTimer = function(incoming) {
             window.syncedTimer = incoming;
             window.activePeriodIndex = incoming.activePeriodIndex || 0;
@@ -1186,7 +1217,7 @@
                     const diffSecs = Math.max(0, Math.round((incoming.endTimeMs - now) / 1000));
                     window.timerSeconds = diffSecs;
                 } else {
-                    window.timerSeconds = incoming.remainingSeconds || 0;
+                    window.timerSeconds = incoming.remainingSeconds || (window.periods[window.activePeriodIndex]?.duration * 60) || 600;
                 }
             }
 
@@ -1203,5 +1234,3 @@
     </script>
 </body>
 </html>
-
-
